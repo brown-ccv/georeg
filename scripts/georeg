@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+import sys
+
+parser = argparse.ArgumentParser(description="process and geocode business registries")
+
+parser.add_argument(
+    "--year", "-y", type=int, required=True, help="""
+        The year of the registry.""")
+parser.add_argument(
+    "--images", "-i", required=True, nargs='+', help="""
+        Images to process.""")
+parser.add_argument(
+    "--config", "-c", help="""
+        Path to the configuration file.""")
+parser.add_argument(
+    "--append", action="store_true", help="""
+        Append to the output file instead of overwriting it.""")
+parser.add_argument(
+    "--debug", action="store_true", help="""
+        Draw images showing intermediate output during processing.""")
+parser.add_argument(
+    "--pre-processed", action="store_true", help="""
+        Assume images have been preprocessed by scan-tailor.""")
+
+args = parser.parse_args()
+
+# import registry processor based on year
+if args.year > 1971:
+    from georeg.registry_processor_new import RegistryProcessorNew as RegistryProcessor
+else:
+    from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor
+
+reg_processor = RegistryProcessor()
+
+if os.path.exists(args.config):
+    reg_processor.load_settings_from_cfg(args.config)
+else: print >>sys.stderr, "configuration file not found"
+
+reg_processor.draw_debug_images = args.debug
+reg_processor.assume_pre_processed = args.pre_processed
+
+if args.append:
+    mode = 'a'
+else:
+    mode = 'w'
+
+outname = "%d-compiled.tsv" % args.year
+
+for image in args.images:
+    print >>sys.stderr, "processing:", image
+    reg_processor.process_image(image)
+    reg_processor.record_to_tsv(outname, mode)
+    if mode == 'w': mode = 'a'
+
+print('\a')  #makes a noise at the end of the script.  May only work on Mac
+print >>sys.stderr, "done"
