@@ -297,10 +297,11 @@ class RegistryProcessor:
         """performs a close operation on self._image then extracts the contours"""
 
         if make_new_thresh: # if thresh_value is provided then we make a new thresh image
+            gray_to_BGR = cv2.cvtColor(self._image, cv2.COLOR_GRAY2BGR)
             if not self.assume_pre_processed:
-                _,self._thresh = cv2.threshold(self._image,self.thresh_value,255,cv2.THRESH_BINARY_INV) # threshold
+                _,self._thresh = cv2.threshold(gray_to_BGR,self.thresh_value,255,cv2.THRESH_BINARY_INV) # threshold
             else:
-                _,self._thresh = cv2.threshold(self._image,0,255,cv2.THRESH_BINARY_INV) # threshold with 0 threshold value
+                _,self._thresh = cv2.threshold(gray_to_BGR,0,255,cv2.THRESH_BINARY_INV) # threshold with 0 threshold value
 
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT,kernel_shape)
         closed = cv2.morphologyEx(self._thresh,cv2.MORPH_CLOSE,kernel,iterations = iter) # close
