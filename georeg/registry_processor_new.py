@@ -27,7 +27,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
         if self.draw_debug_images:
             canvas = np.zeros(self._image.shape,self._image.dtype)
             cv2.drawContours(canvas,[c.data for c in contours],-1,(255,255,255),-1)
-            cv2.imwrite("./testdata/closed.tiff",canvas)
+            cv2.imwrite("closed.tiff",canvas)
 
         column_locations, page_boundary = self._find_column_locations(contours)
         columns, _ = self._assemble_contour_columns(contours, column_locations)
@@ -69,7 +69,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
 
         if self.draw_debug_images:
             # write original image with added contours to disk
-            cv2.imwrite("./testdata/contoured.tiff", contoured)
+            cv2.imwrite("contoured.tiff", contoured)
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1979-onward"""

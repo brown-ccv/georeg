@@ -418,7 +418,7 @@ class RegistryProcessor:
                 cv2.line(canvas,(column_l.x + column_l.w / 2, 0),(column_l.x + column_l.w / 2, self._image_height()),grey,20)
 
             # draw column lines to file
-            cv2.imwrite("./testdata/column_lines.tiff", canvas)
+            cv2.imwrite("column_lines.tiff", canvas)
 
         return column_locations, page_boundary
 

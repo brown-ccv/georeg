@@ -31,7 +31,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
         if self.draw_debug_images:
             canvas = np.zeros(self._image.shape,self._image.dtype)
             cv2.drawContours(canvas,[c.data for c in contours],-1,(255,255,255),-1)
-            cv2.imwrite("./testdata/closed.tiff",canvas)
+            cv2.imwrite("closed.tiff",canvas)
 
         business_groups = self._sort_business_group_contours(contours)
         self.businesses = []
@@ -99,7 +99,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         if self.draw_debug_images:
             # write original image with added contours to disk
-            cv2.imwrite("./testdata/contoured.tiff", contoured)
+            cv2.imwrite("contoured.tiff", contoured)
 
             # save a second copy that won't be overriden
             cv2.imwrite(os.path.splitext(path)[0] + "-contoured.tiff", contoured)
@@ -187,7 +187,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             canvas = self._thresh.copy()
             for c in header_contours:
                 cv2.circle(canvas,(c.x_mid,c.y_mid),20,(255,255,255),35)
-            cv2.imwrite("./testdata/headers.tiff", canvas)
+            cv2.imwrite("headers.tiff", canvas)
 
         return header_contours, non_header_contours
 
