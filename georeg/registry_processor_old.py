@@ -21,7 +21,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         self._image = cv2.imread(path)
 
-        contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
+        _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
         contours = [reg.Contour(c) for c in contours]
 
         # remove noise from edge of image
