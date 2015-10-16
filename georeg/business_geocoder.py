@@ -2,7 +2,7 @@ import urllib
 import urllib2
 from registry_processor import RegistryProcessorException # we'll use this here too
 
-api_key = "2a7092a7a8034fc5a9e6683692da1d16"
+api_key = "de15a680b76f43efbc9d59c7f4e1f7b2"
 
 def get_remaining_credits():
     credit_check_url = "https://geoservices.tamu.edu/UserServices/Payments/Balance/AccountBalanceWebServiceHttp.aspx"
