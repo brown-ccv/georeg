@@ -1,0 +1,3 @@
+[submodule "brown_geopy"]
+	path = brown_geopy
+	url = git@bitbucket.org:eknoll/brown-gis.git
