@@ -16,7 +16,8 @@ setup(
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7"],
     provides=["georeg"],
-    packages=["georeg"],
+    packages=["georeg", "brown_geopy"],
     package_data={"georeg": ["data/*"]},
     scripts=["scripts/georeg"]
+
 )
