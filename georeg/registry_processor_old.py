@@ -57,6 +57,8 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
             header_crop = self._thresh[y:y+h, x:x+w]
             header_str = self._ocr_image(header_crop)
+            # remove surrounding quotes and newline chars
+            header_str = re.sub(r'^"|\n|"$', ' ', header_str).strip()
 
             for business in business_group:
                 # make bounding box bigger
