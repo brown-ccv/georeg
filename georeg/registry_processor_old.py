@@ -13,7 +13,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
     def __init__(self):
         # init parent class
         reg.RegistryProcessor.__init__(self)
-        self.__zip_pattern = re.compile(r'^.*\d{5}')
+        self.__zip_pattern = re.compile(r'(?P<address>^.*)[\s]+(?P<zip>\d{5})[\s-]*')
         self.__emp_pattern = re.compile(r'[Ee]mp.*\d+')
 
     def _process_image(self, path):
@@ -119,8 +119,8 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         match = self.__zip_pattern.search(address_line)
         if match:
-            business.zip = address_line[-5:]
-            address_line = address_line[:-5]
+            business.zip = match.group("zip")
+            address_line = match.group("address")
 
         business.address = address_line
 
