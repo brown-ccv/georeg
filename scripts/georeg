@@ -28,7 +28,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 # import registry processor based on year
-if args.year > 1971:
+if args.year > 1975:
     from georeg.registry_processor_new import RegistryProcessorNew as RegistryProcessor
 else:
     from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor

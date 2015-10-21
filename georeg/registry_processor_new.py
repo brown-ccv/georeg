@@ -9,7 +9,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
     def __init__(self):
         # init parent class
         reg.RegistryProcessor.__init__(self)
-        self.__city_pattern = re.compile(r'[A-Za-z]+[ \t]{0,2}[A-Za-z]*(?=[,.][ \t]+(RI|AI))')
+        self.__city_pattern = re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2})')
         self.__emp_pattern = re.compile(r'[Ee]mp.*\d+')
 
     def _process_image(self, path):
