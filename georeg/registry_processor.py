@@ -107,7 +107,7 @@ class RegistryProcessor:
 
         # image processing parameters (these are example values)
         self.kernel_shape = (10,3)
-        self.thresh_value = 60 # higher = more exposure (max = 255)
+        self.thresh_value = 60 # higher = more exposure (max = 255) 
         self.iterations = 8
         self.match_rate = 0.7 # lower = more lenient
 
@@ -224,7 +224,7 @@ class RegistryProcessor:
         cp = ConfigParser.ConfigParser()
         cp.read(path + '.cfg')
 
-        self.kernel = (int(cp.get('RegistryProcessor','kernel_shape_x')),int(cp.get('RegistryProcessor','kernel_shape_y')))
+        self.kernel_shape = (int(cp.get('RegistryProcessor','kernel_shape_x')),int(cp.get('RegistryProcessor','kernel_shape_y')))
         self.thresh_value = int(cp.get('RegistryProcessor','thresh_value'))
         self.iterations = int(cp.get('RegistryProcessor','iterations'))
         self.match_rate = float(cp.get('RegistryProcessor','match_rate'))
