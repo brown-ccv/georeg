@@ -14,7 +14,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
         # init parent class
         reg.RegistryProcessor.__init__(self)
         self.__zip_pattern = re.compile(r'(?P<address>^.*)[\s]+(?P<zip>\d{5})[\s-]*')
-        self.__emp_pattern = re.compile(r'[Ee]mp.*\d+')
+        self.__emp_pattern = re.compile(r'[Ee]mp.*([A-Z])')
 
     def _process_image(self, path):
         """process a registry image from 1953-1975"""
