@@ -24,6 +24,9 @@ parser.add_argument(
 parser.add_argument(
     "--pre-processed", action="store_true", help="""
         Assume images have been preprocessed by scan-tailor.""")
+parser.add_argument(
+    "--outdir", "-o", help="""
+        Path to the directory to write out results.""")
 
 args = parser.parse_args()
 
@@ -47,7 +50,7 @@ if args.append:
 else:
     mode = 'w'
 
-outname = "%d-compiled.tsv" % args.year
+outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
 
 for image in args.images:
     print >>sys.stderr, "processing:", image
