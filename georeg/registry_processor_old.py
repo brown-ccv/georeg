@@ -81,7 +81,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                         business.manual_inspection = True
                     if len(current_zip) > 0:
                         business.zip = current_zip
-
+                    
                     geo.geocode_business(business)
                     self.businesses.append(business)
                 else: # check if city header

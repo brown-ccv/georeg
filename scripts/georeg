@@ -27,6 +27,9 @@ parser.add_argument(
 parser.add_argument(
     "--outdir", "-o", help="""
         Path to the directory to write out results.""")
+parser.add_argument(
+    "--state", "-s", default="", help="""
+        US state to get city list.""")
 
 args = parser.parse_args()
 
@@ -36,7 +39,7 @@ if args.year > 1975:
 else:
     from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor
 
-reg_processor = RegistryProcessor()
+reg_processor = RegistryProcessor(state=args.state)
 
 if os.path.exists(args.config):
     reg_processor.load_settings_from_cfg(args.config)

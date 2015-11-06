@@ -22,10 +22,14 @@ class CityDetector:
     def load_cities(self, file_name):
         self.city_list = [] # clear old values
 
-        with open(file_name) as file:
-            for line in file:
-                line = line.strip()
-                self.city_list.append(line)
+    	try:
+            with open(file_name) as file:
+                for line in file:
+                    line = line.strip()
+                    self.city_list.append(line)
+	    except:
+            raise IOError("City list doesn't exist")    
+			
 
     def match_to_cities(self, line, cutoff = 0.6):
         line = line.lower().strip()
@@ -41,20 +45,22 @@ class CityDetector:
         return match_list
 
 class Business:
-    def __init__(self):
-        self.name = ""
-        self.city = ""
-        self.zip = ""
-        self.address = ""
-        self.category = "" # business category or sic code depending on year
-        self.emp = "" # employment
 
-        # coordinates
-        self.lat = ""
-        self.long = ""
-        self.confidence_score = 0.0
+    name = ""
+    city = ""
+    zip = ""
+    address = ""
+    category = "" # business category or sic code depending on year
+    emp = "" # employment
+    sales = ""
+	cat_desc = ""
 
-        self.manual_inspection = False
+    # coordinates
+    lat = ""
+    long = ""
+    confidence_score = 0.0
+
+    manual_inspection = False
 
 class Contour:
     def __init__(self, contour = None):
@@ -135,8 +141,10 @@ class RegistryProcessor:
         self.__tmp_path = tempfile.mktemp(suffix=".tiff")
 
         # city lookup
+        self.state = ""
+        self._city_lists_path = os.path.join(_datadir, "%s-cities.txt" % (self.state,))
         self._city_detector = CityDetector()
-        self._city_detector.load_cities(os.path.join(_datadir, "RI-cities.txt"))
+        self._city_detector.load_cities(self._city_lists_path)
 
 
     def __del__(self):
@@ -203,6 +211,7 @@ class RegistryProcessor:
             for business in self.businesses:
                 entry = [business.category, business.name, business.city,
                          business.address, business.zip, business.emp,
+			 business.sales, business.cat_desc,
                          business.lat, business.long, business.confidence_score]
 
                 if business.manual_inspection:

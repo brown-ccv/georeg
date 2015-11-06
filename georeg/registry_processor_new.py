@@ -6,12 +6,12 @@ import registry_processor as reg
 import business_geocoder as geo
 
 class RegistryProcessorNew(reg.RegistryProcessor):
-    def __init__(self):
-        # init parent class
-        reg.RegistryProcessor.__init__(self)
-        self.__city_pattern = re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2})')
-        self.__emp_pattern = re.compile(r'[Ee]mp.*\d+')
-
+    
+    city_pattern = re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2})')
+    emp_pattern = re.compile(r'[Ee]mp.*\d+')
+    registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
+    sic_pattern = re.compile(r'\d{4}')
+    
     def _process_image(self, path):
         """process a registry image from 1971-onward"""
 
@@ -40,11 +40,8 @@ class RegistryProcessorNew(reg.RegistryProcessor):
         if self.draw_debug_images:
             contoured = self._image.copy()
 
-        current_sic = ""
-
-        registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
-        sic_pattern = re.compile(r'\d{4}')
-
+        self.current_sic = ""
+        
         for contour in contours:
             x,y,w,h = self._expand_bb(contour.x,contour.y,contour.w,contour.h)
 
@@ -55,21 +52,25 @@ class RegistryProcessorNew(reg.RegistryProcessor):
             cropped = self._thresh[y:y+h, x:x+w]
             contour_txt = self._ocr_image(cropped)
 
-            registry_match = registry_pattern.match(contour_txt)
-            sic_match = sic_pattern.match(contour_txt)
-
-            if registry_match:
-                business = self._parse_registry_block(contour_txt)
-                business.category = current_sic
-
-                geo.geocode_business(business)
-                self.businesses.append(business)
-            elif sic_match:
-                current_sic = sic_match.group(0)
+            self._process_contour(contour_txt)
 
         if self.draw_debug_images:
             # write original image with added contours to disk
             cv2.imwrite("contoured.tiff", contoured)
+
+    def _process_contour(self, contour_txt):
+        registry_match = self.registry_pattern.match(contour_txt)
+        sic_match = self.sic_pattern.match(contour_txt)
+
+        if registry_match:
+            business = self._parse_registry_block(contour_txt)
+            business.category = self.current_sic
+
+            geo.geocode_business(business)
+            self.businesses.append(business)
+        elif sic_match:
+            self.current_sic = sic_match.group(0)
+
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1979-onward"""
@@ -80,14 +81,14 @@ class RegistryProcessorNew(reg.RegistryProcessor):
         business.name = lines[0]
         business.address = lines[1]
 
-        match = self.__city_pattern.search(registry_txt)
+        match = self.city_pattern.search(registry_txt)
         if match:
             city = match.group(0)
             matches = self._city_detector.match_to_cities(city) # perform spell check and confirm this is a city
             if len(matches) > 0:
                 business.city = matches[0]
 
-        match = self.__emp_pattern.search(registry_txt)
+        match = self.emp_pattern.search(registry_txt)
         if match:
             match = re.search(r"\d+",match.group(0))
             if match:
