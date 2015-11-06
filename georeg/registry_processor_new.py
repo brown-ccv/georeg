@@ -13,7 +13,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
     sic_pattern = re.compile(r'\d{4}')
     
     def _process_image(self, path):
-        """process a registry image from 1971-onward"""
+        """process a registry image from 1975-onward"""
 
         self._image = cv2.imread(path)
 
@@ -73,7 +73,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
 
 
     def _parse_registry_block(self, registry_txt):
-        """works for registries from 1979-onward"""
+        """works for registries from 1975-onward"""
         business = reg.Business()
 
         lines = registry_txt.split("\n")
