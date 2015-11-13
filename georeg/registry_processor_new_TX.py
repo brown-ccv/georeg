@@ -22,7 +22,7 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
 
         if registry_match:
             business = self._parse_registry_block(contour_txt)
-            business.city = self.current_city
+            #business.city = self.current_city
             
             if business.address:
                 geo.geocode_business(business, 'TX')
@@ -49,18 +49,18 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
             if match:
                 business.address = match.group(1)
                 business.zip = match.group(3)
-                #city = match.group(2)
-                #matches = self._city_detector.match_to_cities(city)
-                #if len(matches) > 0:
-                #    business.city = matches[0]
+                city = match.group(2)
+                matches = self._city_detector.match_to_cities(city)
+                if len(matches) > 0:
+                    business.city = matches[0]
 
             match = self.bad_address_pattern.search(full_address)
             if match:
                 business.zip = match.group(2)
-                #city = match.group(1)  
-                #matches = self._city_detector.match_to_cities(city)
-                #if len(matches) > 0:
-                #    business.city = matches[0]
+                city = match.group(1)  
+                matches = self._city_detector.match_to_cities(city)
+                if len(matches) > 0:
+                    business.city = matches[0]
 
         match = self.sic_pattern.search(registry_txt)
         if match:
