@@ -35,16 +35,16 @@ args = parser.parse_args()
 
 # import registry processor based on year
 if args.year > 1975:
-    from georeg.registry_processor_new import RegistryProcessorNew as RegistryProcessor
+    from georeg.registry_processor_new_TX import RegistryProcessorNewTX as RegistryProcessor
 else:
     from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor
 
-reg_processor = RegistryProcessor(state=args.state)
+reg_processor = RegistryProcessor(args.state)
 
 if os.path.exists(args.config):
     reg_processor.load_settings_from_cfg(args.config)
 else: print >>sys.stderr, "configuration file not found"
-
+     
 reg_processor.draw_debug_images = args.debug
 reg_processor.assume_pre_processed = args.pre_processed
 

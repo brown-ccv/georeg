@@ -19,17 +19,14 @@ class CityDetector:
     """loads a file of cities for comparison against strings"""
     def __init__(self):
         self.city_list = []
+        
     def load_cities(self, file_name):
         self.city_list = [] # clear old values
 
-    	try:
-            with open(file_name) as file:
-                for line in file:
-                    line = line.strip()
-                    self.city_list.append(line)
-	    except:
-            raise IOError("City list doesn't exist")    
-			
+        with open(file_name) as file:
+            for line in file:
+                line = line.strip()
+                self.city_list.append(line)
 
     def match_to_cities(self, line, cutoff = 0.6):
         line = line.lower().strip()
@@ -53,7 +50,7 @@ class Business:
     category = "" # business category or sic code depending on year
     emp = "" # employment
     sales = ""
-	cat_desc = ""
+    cat_desc = ""
 
     # coordinates
     lat = ""
@@ -105,7 +102,7 @@ class RegistryProcessorException(Exception):
         return self.value
 
 class RegistryProcessor:
-    def __init__(self):
+    def __init__(self, state):
         self._image = None
         self._image_height = lambda: self._image.shape[0]
         self._image_width = lambda: self._image.shape[1]
@@ -141,7 +138,7 @@ class RegistryProcessor:
         self.__tmp_path = tempfile.mktemp(suffix=".tiff")
 
         # city lookup
-        self.state = ""
+        self.state = state
         self._city_lists_path = os.path.join(_datadir, "%s-cities.txt" % (self.state,))
         self._city_detector = CityDetector()
         self._city_detector.load_cities(self._city_lists_path)
@@ -209,10 +206,7 @@ class RegistryProcessor:
             manual_inspection_writer = None
 
             for business in self.businesses:
-                entry = [business.category, business.name, business.city,
-                         business.address, business.zip, business.emp,
-			 business.sales, business.cat_desc,
-                         business.lat, business.long, business.confidence_score]
+                entry = [business.category, business.name, business.city, business.address, business.zip, business.emp, business.sales, business.cat_desc, business.lat, business.long, business.confidence_score]
 
                 if business.manual_inspection:
                     # if manual inspection file not opened yet open now
