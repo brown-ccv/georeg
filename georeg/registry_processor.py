@@ -51,6 +51,7 @@ class Business:
     emp = "" # employment
     sales = ""
     cat_desc = []
+    bracket = ""
 
     # coordinates
     lat = ""
@@ -206,7 +207,7 @@ class RegistryProcessor:
             manual_inspection_writer = None
 
             for business in self.businesses:
-                entry = [business.category, business.name, business.address, business.city, business.zip, business.emp, business.sales, business.cat_desc, business.lat, business.long, business.confidence_score]
+                entry = [business.category, business.name, business.address, business.city, business.zip, business.emp, business.sales, business.cat_desc, business.bracket, business.lat, business.long, business.confidence_score]
 
                 if business.manual_inspection:
                     # if manual inspection file not opened yet open now
