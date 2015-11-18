@@ -95,7 +95,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
                 business.emp = match.group(0)
 
         # if the city is an empty string or employment is unkown mark for manual inspection
-        if len(business.city) == 0 or len(business.emp) == 0:
+        if business.confidence_score > 0 or len(business.category) == 0:
             business.manual_inspection = True
 
         return business
