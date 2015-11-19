@@ -98,9 +98,5 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
         if match:
             business.sales = match.group(1)
 
-        # if the geocoder is less than 80% confident or there is no SIC code, mark for manual inspection
-        if business.confidence_score < 80 or len(business.category) == 0:
-            business.manual_inspection = True
-
         return business
        

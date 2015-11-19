@@ -60,6 +60,12 @@ class Business:
 
     manual_inspection = False
 
+    def manual_inspection_test(self):
+        # if the geocoder is less than 80% confident or there is no SIC code, mark for manual inspection
+        if self.confidence_score < 80 or not len(self.category):
+            return True
+        return False
+
 class Contour:
     def __init__(self, contour = None):
         self.data = contour
@@ -208,6 +214,8 @@ class RegistryProcessor:
 
             for business in self.businesses:
                 entry = [business.category, business.name, business.address, business.city, business.zip, business.emp, business.sales, business.cat_desc, business.bracket, business.lat, business.long, business.confidence_score]
+
+                business.manual_inspection = business.manual_inspection_test()
 
                 if business.manual_inspection:
                     # if manual inspection file not opened yet open now
