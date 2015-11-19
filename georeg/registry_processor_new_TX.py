@@ -12,11 +12,11 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
     sales_pattern = re.compile(r'Sales[\s]+(.*[\s]+million)')
     emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
     sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-    phone_pattern = re.compile(r'\n(.*)\d{3}/.*[[\s]+\[(.*)\]]*', re.DOTALL)
+    phone_pattern = re.compile(r'\d{3}/.*[[\s]+\[(.*)\]]*', re.DOTALL)
     no_paren_pattern = re.compile(r'[^\(]+')
     paren_pattern = re.compile(r'([^\(]+)\(')
-    good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})', re.DOTALL)
-    bad_address_pattern = re.compile('.*\(mail:\s+.*[,.](.*)[,.].*(\d{5}).*\)', re.DOTALL)
+    good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
+    bad_address_pattern = re.compile(r'\(mail:.*[,.]([\w]{1,2})[,.].*?[,.]?[/s]?(\d{5})-\)')
 
     def _process_contour(self, contour_txt):
         registry_match = self.registry_pattern.match(contour_txt)
@@ -34,7 +34,7 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
             self.current_city = city_match.group(1)
 
     def _parse_registry_block(self, registry_txt):
-        """works for registries from 1985-1999"""
+        """works for registries from 1999"""
 
         business = reg.Business()
 
@@ -42,20 +42,18 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
 
         business.name = lines[0]
 
-        # get full address from line 2 up to area code of phone number and parse for address components
         full_address = ""
         for line in lines:
-            start = re.search('[0-9]+', line)
+            start = re.search('[0-9]{2,}', line)
             end = re.search('\d{3}/', line)
             if start:
                 if end:
                     break
                 full_address += line
                 
-
         match = self.phone_pattern.search(registry_txt)
         if match:    
-            business.bracket = match.group(2)
+            business.bracket = match.group(1)
             
         match = self.no_paren_pattern.search(full_address)
         if match:
@@ -63,20 +61,21 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
             if match:
                 business.address = match.group(1)
                 business.zip = match.group(3)
-                city = match.group(2)
-                matches = self._city_detector.match_to_cities(city)
-                if len(matches) > 0:
-                    business.city = matches[0]
+                business.city = match.group(2)
+                #matches = self._city_detector.match_to_cities(city)
+                #if len(matches) > 0:
+                #    business.city = matches[0]
+        
         match = self.paren_pattern.search(full_address)
         if match:
             business.address = match.group(1)
             match = self.bad_address_pattern.search(full_address)
             if match: 
                 business.zip = match.group(2)
-                city = match.group(1)
-                matches = self._city_detector.match_to_cities(city)
-                if len(matches) > 0:
-                    business.city = matches[0]
+                business.city = match.group(1)
+                #matches = self._city_detector.match_to_cities(city)
+                #if len(matches) > 0:
+                #    business.city = matches[0]
             
         matches = self.sic_pattern.findall(registry_txt)
         category_pattern = re.compile(r'\d{4}')    
@@ -99,7 +98,7 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
         if match:
             business.sales = match.group(1)
 
-        # if the city is an empty string or employment is unknown mark for manual inspection
+        # if the geocoder is less than 80% confident or there is no SIC code, mark for manual inspection
         if business.confidence_score < 80 or len(business.category) == 0:
             business.manual_inspection = True
 
