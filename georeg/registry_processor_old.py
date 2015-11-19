@@ -129,7 +129,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             business.emp = match.group(0)[-1]
 
         # if the city is an empty string or employment is unkown mark for manual inspection
-        if business.confidence_score > 0 or len(business.category) == 0:
+        if business.confidence_score < 80 or len(business.category) == 0:
             business.manual_inspection = True
 
         return business
