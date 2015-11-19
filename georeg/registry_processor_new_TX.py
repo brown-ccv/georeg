@@ -89,7 +89,7 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
             business.sales = match.group(1)
 
         # if the city is an empty string or employment is unknown mark for manual inspection
-        if business.confidence_score > 0 or len(business.category) == 0:
+        if business.confidence_score < 80 or len(business.category) == 0:
             business.manual_inspection = True
 
         return business
