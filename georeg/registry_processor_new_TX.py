@@ -12,7 +12,7 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
     sales_pattern = re.compile(r'Sales[\s]+(.*[\s]+million)')
     emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
     sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-    phone_pattern = re.compile(r'\n(.*)\d{3}/', re.DOTALL)
+    phone_pattern = re.compile(r'\n(.*)\d{3}/.*[[\s]+\[(.*)\]]*', re.DOTALL)
     no_paren_pattern = re.compile(r'[^\(]+')
     paren_pattern = re.compile(r'([^\(]+)\(')
     good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})', re.DOTALL)
@@ -43,29 +43,40 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
         business.name = lines[0]
 
         # get full address from line 2 up to area code of phone number and parse for address components
+        full_address = ""
+        for line in lines:
+            start = re.search('[0-9]+', line)
+            end = re.search('\d{3}/', line)
+            if start:
+                if end:
+                    break
+                full_address += line
+                
+
         match = self.phone_pattern.search(registry_txt)
+        if match:    
+            business.bracket = match.group(2)
+            
+        match = self.no_paren_pattern.search(full_address)
         if match:
-            full_address = match.group(1)    
-            match = self.no_paren_pattern.search(full_address)
-            if match:
-                match = self.good_address_pattern.search(full_address)
-                if match:
-                    business.address = match.group(1)
-                    business.zip = match.group(3)
-                    city = match.group(2)
-                    matches = self._city_detector.match_to_cities(city)
-                    if len(matches) > 0:
-                        business.city = matches[0]
-            match = self.paren_pattern.search(full_address)
+            match = self.good_address_pattern.search(full_address)
             if match:
                 business.address = match.group(1)
-                match = self.bad_address_pattern.search(full_address)
-                if match: 
-                    business.zip = match.group(2)
-                    city = match.group(1)
-                    matches = self._city_detector.match_to_cities(city)
-                    if len(matches) > 0:
-                        business.city = matches[0]
+                business.zip = match.group(3)
+                city = match.group(2)
+                matches = self._city_detector.match_to_cities(city)
+                if len(matches) > 0:
+                    business.city = matches[0]
+        match = self.paren_pattern.search(full_address)
+        if match:
+            business.address = match.group(1)
+            match = self.bad_address_pattern.search(full_address)
+            if match: 
+                business.zip = match.group(2)
+                city = match.group(1)
+                matches = self._city_detector.match_to_cities(city)
+                if len(matches) > 0:
+                    business.city = matches[0]
             
         matches = self.sic_pattern.findall(registry_txt)
         category_pattern = re.compile(r'\d{4}')    
