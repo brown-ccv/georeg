@@ -16,7 +16,9 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
     no_paren_pattern = re.compile(r'[^\(]+')
     paren_pattern = re.compile(r'([^\(]+)\(')
     good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
-    bad_address_pattern = re.compile(r'\(mail:.*[,.]([\w]{1,2})[,.].*?[,.]?[/s]?(\d{5})-\)')
+    good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*)(\d{5})')
+    bad_address_pattern = re.compile(r'\(mail:.*[,.]([\w]{1,2})[,.].*?[,.]?[/s]?(\d{5})-\)') #TOFIX: also, do we even need this info?
+    PO_box_pattern = re.compile(r'Box[\s]+[\d]+')
 
     def _process_contour(self, contour_txt):
         registry_match = self.registry_pattern.match(contour_txt)
@@ -34,7 +36,7 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
             self.current_city = city_match.group(1)
 
     def _parse_registry_block(self, registry_txt):
-        """works for registries from 1999"""
+        """works for registries from 1995-1999"""
 
         business = reg.Business()
 
@@ -65,6 +67,13 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
                 #matches = self._city_detector.match_to_cities(city)
                 #if len(matches) > 0:
                 #    business.city = matches[0]
+            mailing_address = self.PO_box_pattern.search(full_address)
+            if mailing_address: 
+                match = self.good_address_PO_pattern.search(full_address)
+                if match:
+                    business.address = match.group(1)
+                    business.city = match.group(2)
+                    business.zip = match.group(3)
         
         match = self.paren_pattern.search(full_address)
         if match:
@@ -72,7 +81,7 @@ class RegistryProcessorNewTX(regnew.RegistryProcessorNew):
             match = self.bad_address_pattern.search(full_address)
             if match: 
                 business.zip = match.group(2)
-                business.city = match.group(1)
+                #business.city = match.group(1)
                 #matches = self._city_detector.match_to_cities(city)
                 #if len(matches) > 0:
                 #    business.city = matches[0]
