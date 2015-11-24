@@ -28,16 +28,24 @@ parser.add_argument(
     "--outdir", "-o", help="""
         Path to the directory to write out results.""")
 parser.add_argument(
-    "--state", "-s", default="", help="""
+    "--state", "-s", default="", required=True, help="""
         US state to get city list.""")
 
 args = parser.parse_args()
 
 # import registry processor based on year
-if args.year > 1975:
-    from georeg.registry_processor_new_TX import RegistryProcessorNewTX as RegistryProcessor
+if args.state == "RI":
+    if args.year > 1975:
+        from georeg.registry_processor_new import RegistryProcessorNew as RegistryProcessor
+    else:
+        from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor
+elif args.state == "TX":
+    if args.year > 1999:
+        from georeg.registry_processor_TX_2000s import RegistryProcessorTX2000s as RegistryProcessor
+    else: 
+        from georeg.registry_processor_new_TX import RegistryProcessorNewTX as RegistryProcessor
 else:
-    from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor
+    raise ValueError("%s is not a supported state" % (args.state,))
 
 reg_processor = RegistryProcessor(args.state)
 
