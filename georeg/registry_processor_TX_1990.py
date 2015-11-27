@@ -14,14 +14,9 @@ class RegistryProcessorNewTX(reg.RegistryProcessor):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{3}[/\)]{1}.*[[\s]+\[(.*)\]]*', re.DOTALL)
-        self.no_paren_pattern = re.compile(r'[^\(]+')
+        self.phone_pattern = re.compile(r'\(\d{3}\).*[[\s]+\[(.*)\]]*', re.DOTALL)
         self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
-        self.good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*)(\d{5})')
-        self.bad_address_pattern = re.compile(r'\(mail:.*[,.]([\w]{1,2})[,.].*?[,.]?[/s]?(\d{5})-\)')
-        self.PO_box_pattern = re.compile(r'Box[\s]+[\d]+')
-        self.no_PO_pattern = re.compile(r'([^0-9\(]+)TX[\s]*(\d{5})\)')
+        self.address_pattern = re.compile(r'([^0-9\(]+)\s+TX\s+(\d{5}).*\)')
 
     def _process_contour(self, contour_txt):
         registry_match = self.registry_pattern.search(contour_txt)
@@ -29,72 +24,43 @@ class RegistryProcessorNewTX(reg.RegistryProcessor):
 
         if registry_match:
             business = self._parse_registry_block(contour_txt)
-            #business.city = self.current_city
             
             if business.address:
                 geo.geocode_business(business, 'TX')
-            
+
             self.businesses.append(business)
         elif city_match:
             self.current_city = city_match.group(1)
 
     def _parse_registry_block(self, registry_txt):
-        """works for registries from 1990-1999"""
+        """works for registries from 1990"""
 
         business = reg.Business()
 
-        lines = registry_txt.split("\n")
+        lines = registry_txt.split('\n')
 
         business.name = lines[0]
 
         full_address = ""
         for line in lines:
-            start = re.search('[0-9]{2,}', line)
+            start = re.search(r'[0-9]{2,}', line)
             end = self.phone_pattern.search(line)
             if start:
                 if end:
                     break
-                full_address += line
-                
-        match = self.phone_pattern.search(registry_txt)
-        if match:    
-            business.bracket = match.group(1)
-            
-        match = self.no_paren_pattern.search(full_address)
-        if match:
-            match = self.good_address_pattern.search(full_address)
-            if match:
-                business.address = match.group(1)
-                business.zip = match.group(3)
-                business.city = match.group(2)
-                #matches = self._city_detector.match_to_cities(city)
-                #if len(matches) > 0:
-                #    business.city = matches[0]
-            mailing_address = self.PO_box_pattern.search(full_address)
-            if mailing_address: 
-                match = self.good_address_PO_pattern.search(full_address)
-                if match:
-                    business.address = match.group(1)
-                    business.city = match.group(2)
-                    business.zip = match.group(3)
-        
+                full_address += ' '+line
+
         match = self.paren_pattern.search(full_address)
         if match:
             business.address = match.group(1)
-            match = self.no_PO_pattern.search(full_address)
-            if match:
-                business.city = match.group(1)
-                business.zip = match.group(2)
-            match = self.bad_address_pattern.search(full_address)
-            if match: 
-                business.zip = match.group(2)
-                business.city = match.group(1)
-                #matches = self._city_detector.match_to_cities(city)
-                #if len(matches) > 0:
-                #    business.city = matches[0]
+        
+        match = self.address_pattern.search(full_address)
+        if match:
+            business.city = match.group(1)
+            business.zip = match.group(2)
 
         matches = self.sic_pattern.findall(registry_txt)
-        category_pattern = re.compile(r'\d{4}')    
+        category_pattern = re.compile(r'\d{4}')
         cat_desc_pattern = re.compile(r'[^\:0-9\n]+[\n]*[^0-9\:]*')
         one_sic_pattern = re.compile(r'(/d{4}):[/s]+(.*)', re.DOTALL)
         if len(matches) > 0:
@@ -113,5 +79,9 @@ class RegistryProcessorNewTX(reg.RegistryProcessor):
         match = self.sales_pattern.search(registry_txt)
         if match:
             business.sales = match.group(1)
+
+        match = self.phone_pattern.search(registry_txt)
+        if match:
+            business.bracket = match.group(1)
 
         return business

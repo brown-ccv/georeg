@@ -1,19 +1,21 @@
 import registry_processor as reg
-import registry_processor_new as regnew
 import re
 import business_geocoder as geo
 
-class RegistryProcessorTX2000s(regnew.RegistryProcessorNew):
+class RegistryProcessorTX2000s(reg.RegistryProcessor):
 
-    # regex patterns to parse blocks
-    city_pattern = re.compile(r'{A-Za-z\s]+\n\(.*\)')
-    registry_pattern = re.compile(r'.*\n.*[0-9]')
-    sic_pattern = re.compile(r'SIC-([/d]{4}\;)+')
-    naics_pattern = re.compile(r'NAICS-([/d]{6}\;)+')
-    emp_pattern = re.compile(r'Employs-([/d]+),')
-    sales_pattern = re.compile(r'Sales-(.*)')
-    address_pattern = re.compile(r'(.*)\((.*)\)')
-    cat_desc_pattern = re.compile(r'[/d]{6}\;(.*)')
+    def __init__(self):
+        super(RegistryProcessorNewTX, self).__init__(state="TX")
+         
+        # regex patterns to parse blocks
+        self.city_pattern = re.compile(r'{A-Za-z\s]+\n\(.*\)')
+        self.registry_pattern = re.compile(r'.*\n.*[0-9]')
+        self.sic_pattern = re.compile(r'SIC-([/d]{4}\;)+')
+        self.naics_pattern = re.compile(r'NAICS-([/d]{6}\;)+')
+        self.emp_pattern = re.compile(r'Employs-([/d]+),')
+        self.sales_pattern = re.compile(r'Sales-(.*)')
+        self.address_pattern = re.compile(r'(.*)\((.*)\)')
+        self.cat_desc_pattern = re.compile(r'[/d]{6}\;(.*)')
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 2000-2010"""

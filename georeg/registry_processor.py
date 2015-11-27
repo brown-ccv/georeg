@@ -9,6 +9,7 @@ import csv
 import sys
 import subprocess
 import ConfigParser
+import itertools
 from operator import itemgetter, attrgetter
 
 import georeg
@@ -43,22 +44,23 @@ class CityDetector:
 
 class Business:
 
-    name = ""
-    city = ""
-    zip = ""
-    address = ""
-    category = [] # business category or sic code depending on year
-    emp = "" # employment
-    sales = ""
-    cat_desc = []
-    bracket = ""
+    def __init__(self):
+        self.name = ""
+        self.city = ""
+        self.zip = ""
+        self.address = ""
+        self.category = [] # business category or sic code depending on year
+        self.emp = "" # employment
+        self.sales = ""
+        self.cat_desc = []
+        self.bracket = ""
 
-    # coordinates
-    lat = ""
-    long = ""
-    confidence_score = 0.0
+        # coordinates
+        self.lat = ""
+        self.long = ""
+        self.confidence_score = 0.0
 
-    manual_inspection = False
+        self.manual_inspection = False
 
     def manual_inspection_test(self):
         # if the geocoder is less than 80% confident or there is no SIC code, mark for manual inspection
@@ -108,7 +110,7 @@ class RegistryProcessorException(Exception):
     def __str__(self):
         return self.value
 
-class RegistryProcessor:
+class RegistryProcessor(object):
     def __init__(self, state):
         self._image = None
         self._image_height = lambda: self._image.shape[0]
@@ -165,17 +167,53 @@ class RegistryProcessor:
         except RegistryProcessorException as e:
             print >>sys.stderr, "error: %s, skipping" % e
 
-    # NOTE: this needs to be implemented in child classes
     def _process_image(self, path):
         """process a registry image and store results in the businesses member,
         don't call this directly call process_image() instead"""
+
+        self._image = cv2.imread(path)
+
+        _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
+        contours = [Contour(c) for c in contours]
+
+        # remove noise from edge of image
+        if not self.assume_pre_processed:
+            contours = self._remove_edge_contours(contours)
+
+        if self.draw_debug_images:
+            canvas = np.zeros(self._image.shape,self._image.dtype)
+            cv2.drawContours(canvas,[c.data for c in contours],-1,(255,255,255),-1)
+            cv2.imwrite("closed.tiff",canvas)
+
+        column_locations, page_boundary = self._find_column_locations(contours)
+        columns, _ = self._assemble_contour_columns(contours, column_locations)
+        contours = list(itertools.chain.from_iterable(columns))
+
+        contoured = None
+
+        if self.draw_debug_images:
+            contoured = self._image.copy()
+
+        for contour in contours:
+            x,y,w,h = self._expand_bb(contour.x,contour.y,contour.w,contour.h)
+
+            if self.draw_debug_images:
+                # draw bounding box on original image
+                cv2.rectangle(contoured,(x,y),(x+w,y+h),(255,0,255),5)
+
+            cropped = self._thresh[y:y+h, x:x+w]
+            contour_txt = self._ocr_image(cropped)
+
+            self._process_contour(contour_txt)
+
+        if self.draw_debug_images:
+            # write original image with added contours to disk
+            cv2.imwrite("contoured.tiff", contoured)
 
     def load_from_tsv(self, path):
         """load self.businesses from a tsv file where they were previously saved"""
 
         manual_inspec_path = os.path.splitext(path)[0] + "_manual_inspection.tsv"
-
-        self.businesses = []
 
         # mini function for loading an individual business file (normal or manual inspection)
         def load_businesses(path, manual_inspection):

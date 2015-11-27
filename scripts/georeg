@@ -34,20 +34,25 @@ parser.add_argument(
 args = parser.parse_args()
 
 # import registry processor based on year
-if args.state == "RI":
+if args.state == 'RI':
     if args.year > 1975:
-        from georeg.registry_processor_new import RegistryProcessorNew as RegistryProcessor
+        from georeg.registry_processor_TX_1990 import RegistryProcessorNewTX as RegistryProcessor
     else:
         from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor
-elif args.state == "TX":
-    if args.year > 1999:
-        from georeg.registry_processor_TX_2000s import RegistryProcessorTX2000s as RegistryProcessor
-    else: 
-        from georeg.registry_processor_new_TX import RegistryProcessorNewTX as RegistryProcessor
+elif args.state == 'TX':
+    if args.year == 1990:
+        from georeg.registry_processor_TX_1990 import RegistryProcessorNewTX as RegistryProcessor
+    elif args.year == 1995:
+            from georeg.registry_processor_TX_1995 import RegistryProcessorNewTX as RegistryProcessor
+    elif args.year == 1999:
+            from georeg.registry_processor_TX_1999 import RegistryProcessorNewTX as RegistryProcessor
+    else:
+        raise ValueError("%d is not a supported year for TX" % (args.year,))
+
 else:
     raise ValueError("%s is not a supported state" % (args.state,))
 
-reg_processor = RegistryProcessor(args.state)
+reg_processor = RegistryProcessor()
 
 if os.path.exists(args.config):
     reg_processor.load_settings_from_cfg(args.config)

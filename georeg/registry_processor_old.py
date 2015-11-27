@@ -11,10 +11,13 @@ import business_geocoder as geo
 class RegistryProcessorOld(reg.RegistryProcessor):
 
     def __init__(self):
-        # init parent class
-        reg.RegistryProcessor.__init__(self)
-        self.__zip_pattern = re.compile(r'(?P<address>^.*)[\s]+(?P<zip>\d{5})[\s-]*')
-        self.__emp_pattern = re.compile(r'[Ee]mp.*([A-Z])')
+        super(RegistryProcessorOld, self).__init__(state="RI")
+
+        self.zip_pattern = re.compile(r'(?P<address>^.*)[\s]+(?P<zip>\d{5})[\s-]*')
+        self.emp_pattern = re.compile(r'[Ee]mp.*([A-Z])')
+
+        self.current_city = ""
+        self.current_zip = ""
 
     def _process_image(self, path):
         """process a registry image from 1953-1975"""
@@ -34,10 +37,6 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             cv2.imwrite("closed.tiff",canvas)
 
         business_groups = self._sort_business_group_contours(contours)
-        self.businesses = []
-
-        current_city = ""
-        current_zip = ""
 
         if len(business_groups) == 0:
             raise reg.RegistryProcessorException("error finding business groups in the document")
@@ -117,14 +116,14 @@ class RegistryProcessorOld(reg.RegistryProcessor):
         business.name = lines[0]
         address_line = lines[1]
 
-        match = self.__zip_pattern.search(address_line)
+        match = self.zip_pattern.search(address_line)
         if match:
             business.zip = match.group("zip")
             address_line = match.group("address")
 
         business.address = address_line
 
-        match = self.__emp_pattern.search(registry_txt)
+        match = self.emp_pattern.search(registry_txt)
         if match:
             business.emp = match.group(0)[-1]
 

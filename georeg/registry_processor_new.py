@@ -1,62 +1,20 @@
 import cv2
 import re
-import itertools
 import numpy as np
 import registry_processor as reg
 import business_geocoder as geo
 
 class RegistryProcessorNew(reg.RegistryProcessor):
     
-    city_pattern = re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2})')
-    emp_pattern = re.compile(r'[Ee]mp.*\d+')
-    registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
-    sic_pattern = re.compile(r'\d{4}')
-    
-    def _process_image(self, path):
-        """process a registry image from 1975-onward"""
-
-        self._image = cv2.imread(path)
-
-        _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
-        contours = [reg.Contour(c) for c in contours]
-
-        # remove noise from edge of image
-        if not self.assume_pre_processed:
-            contours = self._remove_edge_contours(contours)
-
-        if self.draw_debug_images:
-            canvas = np.zeros(self._image.shape,self._image.dtype)
-            cv2.drawContours(canvas,[c.data for c in contours],-1,(255,255,255),-1)
-            cv2.imwrite("closed.tiff",canvas)
-
-        column_locations, page_boundary = self._find_column_locations(contours)
-        columns, _ = self._assemble_contour_columns(contours, column_locations)
-        contours = list(itertools.chain.from_iterable(columns))
-
-        self.businesses = []
-
-        contoured = None
-
-        if self.draw_debug_images:
-            contoured = self._image.copy()
-
+    def __init__(self):
+        super(RegistryProcessorNew, self).__init__(state="RI")
+         
         self.current_sic = ""
-        
-        for contour in contours:
-            x,y,w,h = self._expand_bb(contour.x,contour.y,contour.w,contour.h)
 
-            if self.draw_debug_images:
-                # draw bounding box on original image
-                cv2.rectangle(contoured,(x,y),(x+w,y+h),(255,0,255),5)
-
-            cropped = self._thresh[y:y+h, x:x+w]
-            contour_txt = self._ocr_image(cropped)
-
-            self._process_contour(contour_txt)
-
-        if self.draw_debug_images:
-            # write original image with added contours to disk
-            cv2.imwrite("contoured.tiff", contoured)
+        self.city_pattern = re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2})')
+        self.emp_pattern = re.compile(r'[Ee]mp.*\d+')
+        self.registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
+        self.sic_pattern = re.compile(r'\d{4}')
 
     def _process_contour(self, contour_txt):
         registry_match = self.registry_pattern.match(contour_txt)
