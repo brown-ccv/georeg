@@ -4,6 +4,8 @@ import argparse
 import os
 import sys
 
+import georeg
+
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
 parser.add_argument(
@@ -12,9 +14,6 @@ parser.add_argument(
 parser.add_argument(
     "--images", "-i", required=True, nargs='+', help="""
         Images to process.""")
-parser.add_argument(
-    "--config", "-c", help="""
-        Path to the configuration file.""")
 parser.add_argument(
     "--append", action="store_true", help="""
         Append to the output file instead of overwriting it.""")
@@ -54,9 +53,13 @@ else:
 
 reg_processor = RegistryProcessor()
 
-if os.path.exists(args.config):
-    reg_processor.load_settings_from_cfg(args.config)
-else: print >>sys.stderr, "configuration file not found"
+basepath = georeg.__path__[0]
+filename = str(args.year) + '.cfg'
+path = os.path.abspath(os.path.join(basepath, "configs", args.state, filename))
+if os.path.exists(path):
+    reg_processor.load_settings_from_cfg(path)
+else:
+    print >>sys.stderr, "configuration file not found"
      
 reg_processor.draw_debug_images = args.debug
 reg_processor.assume_pre_processed = args.pre_processed

@@ -268,11 +268,8 @@ class RegistryProcessor(object):
                 manual_inspection_file.close()
 
     def load_settings_from_cfg(self, path):
-        # remove exenstion
-        path = os.path.splitext(path)[0]
-
         cp = ConfigParser.ConfigParser()
-        cp.read(path + '.cfg')
+        cp.read(path)
 
         self.kernel_shape = (int(cp.get('RegistryProcessor','kernel_shape_x')),int(cp.get('RegistryProcessor','kernel_shape_y')))
         self.thresh_value = int(cp.get('RegistryProcessor','thresh_value'))
@@ -284,9 +281,6 @@ class RegistryProcessor(object):
         self.bb_expansion_percent = float(cp.get('RegistryProcessor','bb_expansion_percent'))
 
     def save_settings_to_cfg(self, path):
-        # remove exenstion
-        path = os.path.splitext(path)[0]
-
         cp = ConfigParser.SafeConfigParser()
 
         cp.add_section('RegistryProcessor')
@@ -300,7 +294,7 @@ class RegistryProcessor(object):
         cp.set('RegistryProcessor','discard_extra_column_behavior',str(self.discard_extra_column_behavior))
         cp.set('RegistryProcessor','bb_expansion_percent',str(self.bb_expansion_percent))
 
-        with open(path + '.cfg','w') as cfg_file:
+        with open(path,'w') as cfg_file:
             cp.write(cfg_file)
 
     def _remove_edge_contours(self, contours):
