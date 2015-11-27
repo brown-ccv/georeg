@@ -35,32 +35,24 @@ args = parser.parse_args()
 # import registry processor based on year
 if args.state == 'RI':
     if args.year > 1975:
-        from georeg.registry_processor_TX_1990 import RegistryProcessorNewTX as RegistryProcessor
+        from georeg.registry_processor_ri import RegistryProcessorNew as RegistryProcessor
     else:
-        from georeg.registry_processor_old import RegistryProcessorOld as RegistryProcessor
+        from georeg.registry_processor_ri import RegistryProcessorOld as RegistryProcessor
 elif args.state == 'TX':
     if args.year == 1990:
-        from georeg.registry_processor_TX_1990 import RegistryProcessorNewTX as RegistryProcessor
+        from georeg.registry_processor_tx import RegistryProcessor1990 as RegistryProcessor
     elif args.year == 1995:
-            from georeg.registry_processor_TX_1995 import RegistryProcessorNewTX as RegistryProcessor
+        from georeg.registry_processor_tx import RegistryProcessor1995 as RegistryProcessor
     elif args.year == 1999:
-            from georeg.registry_processor_TX_1999 import RegistryProcessorNewTX as RegistryProcessor
+        from georeg.registry_processor_tx import RegistryProcessor1999 as RegistryProcessor
     else:
         raise ValueError("%d is not a supported year for TX" % (args.year,))
 
 else:
     raise ValueError("%s is not a supported state" % (args.state,))
 
-reg_processor = RegistryProcessor()
+reg_processor = RegistryProcessor(args.state, args.year)
 
-basepath = georeg.__path__[0]
-filename = str(args.year) + '.cfg'
-path = os.path.abspath(os.path.join(basepath, "configs", args.state, filename))
-if os.path.exists(path):
-    reg_processor.load_settings_from_cfg(path)
-else:
-    print >>sys.stderr, "configuration file not found"
-     
 reg_processor.draw_debug_images = args.debug
 reg_processor.assume_pre_processed = args.pre_processed
 

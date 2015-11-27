@@ -111,7 +111,7 @@ class RegistryProcessorException(Exception):
         return self.value
 
 class RegistryProcessor(object):
-    def __init__(self, state):
+    def __init__(self, state, year):
         self._image = None
         self._image_height = lambda: self._image.shape[0]
         self._image_width = lambda: self._image.shape[1]
@@ -152,6 +152,15 @@ class RegistryProcessor(object):
         self._city_detector = CityDetector()
         self._city_detector.load_cities(self._city_lists_path)
 
+        # load config file
+        basepath = georeg.__path__[0]
+        filename = str(year) + '.cfg'
+        path = os.path.abspath(os.path.join(basepath, "configs", state, filename))
+        if os.path.exists(path):
+            self.load_settings_from_cfg(path)
+        else:
+            print >>sys.stderr, "configuration file not found"
+     
 
     def __del__(self):
         # clean up our temp files
