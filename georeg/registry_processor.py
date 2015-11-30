@@ -180,6 +180,8 @@ class RegistryProcessor(object):
         """process a registry image and store results in the businesses member,
         don't call this directly call process_image() instead"""
 
+        self.businesses = [] # reset businesses list
+
         self._image = cv2.imread(path)
 
         _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
@@ -221,6 +223,8 @@ class RegistryProcessor(object):
 
     def load_from_tsv(self, path):
         """load self.businesses from a tsv file where they were previously saved"""
+
+        self.businesses = [] # reset businesses list
 
         manual_inspec_path = os.path.splitext(path)[0] + "_manual_inspection.tsv"
 

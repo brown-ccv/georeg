@@ -79,6 +79,8 @@ class RegistryProcessorOld(reg.RegistryProcessor):
     def _process_image(self, path):
         """process a registry image from 1953-1975"""
 
+        self.businesses = [] # reset businesses list
+
         self._image = cv2.imread(path)
 
         _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
