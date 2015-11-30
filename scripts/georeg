@@ -24,7 +24,7 @@ parser.add_argument(
     "--pre-processed", action="store_true", help="""
         Assume images have been preprocessed by scan-tailor.""")
 parser.add_argument(
-    "--outdir", "-o", help="""
+    "--outdir", "-o", required=True, help="""
         Path to the directory to write out results.""")
 parser.add_argument(
     "--state", "-s", default="", required=True, help="""
@@ -34,7 +34,7 @@ args = parser.parse_args()
 
 # import registry processor based on year
 if args.state == 'RI':
-    if args.year > 1975:
+    if args.year >= 1975:
         from georeg.registry_processor_ri import RegistryProcessorNew as RegistryProcessor
     else:
         from georeg.registry_processor_ri import RegistryProcessorOld as RegistryProcessor

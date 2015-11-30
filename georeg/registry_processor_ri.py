@@ -131,10 +131,10 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                 if contour_txt.count("\n") > 0: # if the contour's text has 2 or more lines consider it a registry
                     business = self._parse_registry_block(contour_txt)
                     business.category = header_str
-                    if len(current_city) > 0:
-                        business.city = current_city
-                    if len(current_zip) > 0:
-                        business.zip = current_zip
+                    if len(self.current_city) > 0:
+                        business.city = self.current_city
+                    if len(self.current_zip) > 0:
+                        business.zip = self.current_zip
                     
                     geo.geocode_business(business)
                     self.businesses.append(business)
@@ -150,8 +150,8 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                     matches = self._city_detector.match_to_cities(contour_txt)
 
                     if len(matches) > 0:
-                        current_city = matches[0]
-                        current_zip = zip
+                        self.current_city = matches[0]
+                        self.current_zip = zip
 
         if self.draw_debug_images:
             # write original image with added contours to disk
