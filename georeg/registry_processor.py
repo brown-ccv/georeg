@@ -63,8 +63,8 @@ class Business:
         self.manual_inspection = False
 
     def manual_inspection_test(self):
-        # if the geocoder is less than 80% confident or there is no SIC code, mark for manual inspection
-        if self.confidence_score < 80 or not len(self.category):
+        # if the geocoder is 0% confident or there is no SIC code, mark for manual inspection
+        if not self.confidence_score or not len(self.category):
             return True
         return False
 
