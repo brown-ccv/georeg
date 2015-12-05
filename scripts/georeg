@@ -45,6 +45,8 @@ elif args.state == 'TX':
         from georeg.registry_processor_tx import RegistryProcessor1995 as RegistryProcessor
     elif args.year == 1999:
         from georeg.registry_processor_tx import RegistryProcessor1999 as RegistryProcessor
+    elif args.year == 1975:
+        from georeg.registry_processor_tx import RegistryProcessor1975 as RegistryProcessor
     else:
         raise ValueError("%d is not a supported year for TX" % (args.year,))
 

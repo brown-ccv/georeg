@@ -221,6 +221,11 @@ class RegistryProcessor(object):
             # write original image with added contours to disk
             cv2.imwrite("contoured.tiff", contoured)
 
+    def _process_contour(self, contour_txt):
+        """perform pre-processing and ocr on contour"""
+
+        raise NotImplementedError
+
     def load_from_tsv(self, path):
         """load self.businesses from a tsv file where they were previously saved"""
 

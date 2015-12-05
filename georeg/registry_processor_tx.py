@@ -1,8 +1,26 @@
 """ Processes industrial registries from Texas."""
 
-import registry_processor as reg
 import re
+
+import numpy as np
+
+import registry_processor as reg
 import business_geocoder as geo
+
+
+def generate_contour(x1, x2, y1, y2):
+    """Generate rectangular Contour object from four corners."""
+
+    # Set coordinates of rectangle.
+    coords = np.array([
+        [[x1, y1]],
+        [[x1, y2]],
+        [[x2, y2]],
+        [[x2, y1]]
+    ])
+
+    return reg.Contour(coords)
+
 
 class RegistryProcessorTX(reg.RegistryProcessor):
     """Base class for parsing TX registries."""
@@ -20,11 +38,156 @@ class RegistryProcessorTX(reg.RegistryProcessor):
             business = self._parse_registry_block(contour_txt)
             
             if business.address:
-                geo.geocode_business(business, self.state)
+                try:
+                    geo.geocode_business(business, self.state)
+                except:
+                    print("Unable to geocode: %s" % business.address)
 
             self.businesses.append(business)
+
         elif city_match:
             self.current_city = city_match.group(1)
+
+
+class RegistryProcessorOldTX(RegistryProcessorTX):
+    """Base class for parsing TX registries from 1975 and earlier."""
+
+    def __init__(self, *args, **kwargs):
+        super(RegistryProcessorOldTX, self).__init__(*args, **kwargs)
+         
+        self.indent_width = 70 # Width from edge beyond which pt is considered indented
+
+        self._expand_bb = lambda x,y,w,h: (x - int(round(self._image_width() * self.bb_expansion_percent / 2.0)), \
+                                           y - int(round(self._image_height() * self.bb_expansion_percent / 2.0)), \
+                                           w + int(round(self._image_width() * self.bb_expansion_percent / 2.0)), \
+                                           h + int(round(self._image_height() * self.bb_expansion_percent / 2.0)))
+                                               
+
+    def _assemble_contour_columns(self, contours, column_locations):
+        """Separate contours that fit into columns from those that don't,
+        splitting column contours based on hanging indents."""
+
+        column_contours, non_column_contours = super(
+                RegistryProcessorOldTX, self)._assemble_contour_columns(contours, 
+                                                                        column_locations)
+
+        split_contours = []
+
+        for i, column in enumerate(column_contours):
+            split_contours.append([])
+
+            for contour in column:
+                left_aligned = True
+                y_top = contour.y
+                y_bottom = contour.y + contour.h
+
+                for [[x, y]] in contour.data:
+                    if left_aligned:
+                        if x >= contour.x + self.indent_width:
+                            # Mark that coordinates are indented.
+                            left_aligned = False
+                    else:
+                        if x <= contour.x + self.indent_width:
+                            # Mark that coordinates no longer indented.
+                            left_aligned = True
+                            # Set y as bottom of block.
+                            y_bottom = y
+                            # Create rect from last block to this one.
+                            c = generate_contour(contour.x, 
+                                                 contour.x + contour.w,
+                                                 y_top,
+                                                 y_bottom)
+                            # Append to contours.
+                            split_contours[i].append(c)
+                            # Set y as top of next block.
+                            y_top = y
+
+                c = generate_contour(contour.x, 
+                                     contour.x + contour.w,
+                                     y_top,
+                                     contour.y + contour.h)
+                split_contours[i].append(c)
+
+        return split_contours, non_column_contours
+
+
+class RegistryProcessor1975(RegistryProcessorOldTX):
+    """1975 TX registry parser."""
+
+    def __init__(self, *args, **kwargs):
+        super(RegistryProcessor1975, self).__init__(*args, **kwargs)
+         
+        self.current_city = ""
+
+        self.city_pattern = re.compile(r'([^0-9])')
+        self.registry_pattern = re.compile(r'[0-9]+')
+        self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
+        self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
+        self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
+        self.phone_pattern = re.compile(r'\d{3}/.*')
+        self.no_paren_pattern = re.compile(r'[^\(]+')
+        self.paren_pattern = re.compile(r'([^\(]+)\(')
+        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*(\d{5})-\d{4}\)')
+        self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
+
+    def _parse_registry_block(self, registry_txt):
+        business = reg.Business()
+
+        lines = registry_txt.split('\n')
+
+        business.name = lines[0]
+
+        full_address = ""
+        for line in lines:
+            start = re.search('[0-9]{2,}', line)
+            end = self.phone_pattern.search(line)
+            if start:
+                if end:
+                    break
+                full_address += ' '+line
+
+        match = self.paren_pattern.search(full_address)
+        if match:
+            business.address = match.group(1)
+            match = self.bad_address_pattern.search(full_address)
+            if match:
+                business.city = match.group(1)
+                business.zip = match.group(2)
+        else:
+            match = self.good_address_pattern.search(full_address)
+            if match:
+                business.address = match.group(1)
+                business.city = match.group(2)
+                business.zip = match.group(3)
+            
+
+        matches = self.sic_pattern.findall(registry_txt)
+        category_pattern = re.compile(r'\d{4}')
+        cat_desc_pattern = re.compile(r'[^\:0-9\n]+[\n]*[^0-9\:]*')
+        one_sic_pattern = re.compile(r'(/d{4}):[/s]+(.*)', re.DOTALL)
+        if len(matches) > 0:
+            business.category = category_pattern.findall(matches[0])
+            business.cat_desc = cat_desc_pattern.findall(matches[0])
+        else:
+            match = one_sic_pattern.search(registry_txt)
+            if match:
+                business.category = match.group(1)
+                business.cat_desc = match.group(2)
+            else:
+                match = one_sic_pattern.search(registry_txt)
+                if match:
+                    business.category = match.group(1)
+                    business.cat_desc = match.group(2)
+
+        match = self.emp_pattern.search(registry_txt)
+        if match:
+            business.emp = match.group(1)
+
+        match = self.sales_pattern.search(registry_txt)
+        if match:
+            business.sales = match.group(1)
+
+        return business
 
 
 class RegistryProcessor1980s(RegistryProcessorTX):
