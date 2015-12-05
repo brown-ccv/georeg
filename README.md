@@ -9,4 +9,4 @@
 
 # Test
 
-        georeg --config configs/1979.cfg --year 1979 --images test/DSCN0766.JPG
+        georeg --year 1979 --state RI --images test/DSCN0766.JPG --outdir .
