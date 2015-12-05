@@ -55,8 +55,6 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
     def __init__(self, *args, **kwargs):
         super(RegistryProcessorOldTX, self).__init__(*args, **kwargs)
          
-        self.indent_width = 70 # Width from edge beyond which pt is considered indented
-
         self._expand_bb = lambda x,y,w,h: (x - int(round(self._image_width() * self.bb_expansion_percent / 2.0)), \
                                            y - int(round(self._image_height() * self.bb_expansion_percent / 2.0)), \
                                            w + int(round(self._image_width() * self.bb_expansion_percent / 2.0)), \
@@ -77,17 +75,17 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
             split_contours.append([])
 
             for contour in column:
-                left_aligned = True
-                y_top = contour.y
-                y_bottom = contour.y + contour.h
+                left_aligned = True # Assume contour starts unindented.
+                y_top = contour.y # Top of the contour split.
+                y_bottom = contour.y + contour.h # Bottom of the contour split.
 
                 for [[x, y]] in contour.data:
                     if left_aligned:
-                        if x >= contour.x + self.indent_width:
+                        if x > contour.x + contour.w * self.indent_width:
                             # Mark that coordinates are indented.
                             left_aligned = False
                     else:
-                        if x <= contour.x + self.indent_width:
+                        if x <= contour.x + contour.w * self.indent_width:
                             # Mark that coordinates no longer indented.
                             left_aligned = True
                             # Set y as bottom of block.
@@ -102,6 +100,8 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
                             # Set y as top of next block.
                             y_top = y
 
+                # Add a contour split from the last top coord to the bottom of
+                # the contour.
                 c = generate_contour(contour.x, 
                                      contour.x + contour.w,
                                      y_top,
@@ -121,71 +121,40 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
 
         self.city_pattern = re.compile(r'([^0-9])')
         self.registry_pattern = re.compile(r'[0-9]+')
-        self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
-        self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
-        self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{3}/.*')
-        self.no_paren_pattern = re.compile(r'[^\(]+')
-        self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*(\d{5})-\d{4}\)')
-        self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
+        self.name_pattern_1 = re.compile(r'.*(Inc|Co|Corp|Ltd|Mfg)\s*\.\s*(?=,)')
+        self.name_pattern_2 = re.compile(r'.*(?=,\s*[0-9])')
+        self.address_pattern = re.compile(r'(\d.*?)(\(.*?\))')
+        self.city_pattern = re.compile(r'([^0-9])')
+        self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
 
         lines = registry_txt.split('\n')
+        registry_txt = registry_txt.replace('\n', '')
 
-        business.name = lines[0]
-
-        full_address = ""
-        for line in lines:
-            start = re.search('[0-9]{2,}', line)
-            end = self.phone_pattern.search(line)
-            if start:
-                if end:
-                    break
-                full_address += ' '+line
-
-        match = self.paren_pattern.search(full_address)
-        if match:
-            business.address = match.group(1)
-            match = self.bad_address_pattern.search(full_address)
-            if match:
-                business.city = match.group(1)
-                business.zip = match.group(2)
+        # Look for name match in first line.
+        name_match = re.match(self.name_pattern_1, lines[0])
+        if not name_match:
+            name_match = re.match(self.name_pattern_2, lines[0])
+        if name_match:
+            business.name = name_match.group(0)
+            registry_txt = re.sub(re.escape(business.name), '', registry_txt)
         else:
-            match = self.good_address_pattern.search(full_address)
-            if match:
-                business.address = match.group(1)
-                business.city = match.group(2)
-                business.zip = match.group(3)
-            
+            # Set to entire first line if no match found.
+            business.name = lines[0]
 
-        matches = self.sic_pattern.findall(registry_txt)
-        category_pattern = re.compile(r'\d{4}')
-        cat_desc_pattern = re.compile(r'[^\:0-9\n]+[\n]*[^0-9\:]*')
-        one_sic_pattern = re.compile(r'(/d{4}):[/s]+(.*)', re.DOTALL)
-        if len(matches) > 0:
-            business.category = category_pattern.findall(matches[0])
-            business.cat_desc = cat_desc_pattern.findall(matches[0])
-        else:
-            match = one_sic_pattern.search(registry_txt)
-            if match:
-                business.category = match.group(1)
-                business.cat_desc = match.group(2)
-            else:
-                match = one_sic_pattern.search(registry_txt)
-                if match:
-                    business.category = match.group(1)
-                    business.cat_desc = match.group(2)
+        # Find address match.
+        address_match = re.search(self.address_pattern, registry_txt)
+        if address_match:
+            business.address = address_match.group(1)
+            registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
-        match = self.emp_pattern.search(registry_txt)
-        if match:
-            business.emp = match.group(1)
-
-        match = self.sales_pattern.search(registry_txt)
-        if match:
-            business.sales = match.group(1)
+        # Find SIC matches.
+        sic_matches = self.sic_pattern.findall(registry_txt)
+        for desc, num in sic_matches:
+            business.category = num
+            business.cat_desc = desc
 
         return business
 

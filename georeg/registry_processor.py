@@ -122,6 +122,7 @@ class RegistryProcessor(object):
         self.thresh_value = 60 # higher = more exposure (max = 255) 
         self.iterations = 8
         self.match_rate = 0.7 # lower = more lenient
+        self.indent_width = 0.1 # indent width as % of contour width
 
         # percent of image width and height to add to bounding box width and height of contours (improves ocr accuracy)
         # higher = bigger bounding box
@@ -286,17 +287,30 @@ class RegistryProcessor(object):
                 manual_inspection_file.close()
 
     def load_settings_from_cfg(self, path):
-        cp = ConfigParser.ConfigParser()
+        # Set default values.
+        cp = ConfigParser.ConfigParser({
+                'kernel_shape_x': str(self.kernel_shape),
+                'thresh_value': str(self.thresh_value),
+                'iterations': str(self.iterations),
+                'match_rate': str(self.match_rate),
+                'columns_per_page': str(self.columns_per_page),
+                'pages_per_image': str(self.pages_per_image),
+                'discard_extra_column_behavior': str(self.discard_extra_column_behavior),
+                'bb_expansion_percent': str(self.bb_expansion_percent), 
+                'indent_width': str(self.indent_width),
+            })
         cp.read(path)
 
+        # Get values from config file.
         self.kernel_shape = (int(cp.get('RegistryProcessor','kernel_shape_x')),int(cp.get('RegistryProcessor','kernel_shape_y')))
-        self.thresh_value = int(cp.get('RegistryProcessor','thresh_value'))
-        self.iterations = int(cp.get('RegistryProcessor','iterations'))
-        self.match_rate = float(cp.get('RegistryProcessor','match_rate'))
-        self.columns_per_page = int(cp.get('RegistryProcessor','columns_per_page'))
-        self.pages_per_image = int(cp.get('RegistryProcessor','pages_per_image'))
-        self.discard_extra_column_behavior = int(cp.get('RegistryProcessor','discard_extra_column_behavior'))
-        self.bb_expansion_percent = float(cp.get('RegistryProcessor','bb_expansion_percent'))
+        self.thresh_value = cp.getint('RegistryProcessor','thresh_value')
+        self.iterations = cp.getint('RegistryProcessor','iterations')
+        self.match_rate = cp.getfloat('RegistryProcessor','match_rate')
+        self.columns_per_page = cp.getint('RegistryProcessor','columns_per_page')
+        self.pages_per_image = cp.getint('RegistryProcessor','pages_per_image')
+        self.discard_extra_column_behavior = cp.getint('RegistryProcessor','discard_extra_column_behavior')
+        self.bb_expansion_percent = cp.getfloat('RegistryProcessor','bb_expansion_percent')
+        self.indent_width = cp.getfloat('RegistryProcessor','indent_width')
 
     def save_settings_to_cfg(self, path):
         cp = ConfigParser.SafeConfigParser()
