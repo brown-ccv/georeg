@@ -122,7 +122,7 @@ class RegistryProcessor(object):
         self.thresh_value = 60 # higher = more exposure (max = 255) 
         self.iterations = 8
         self.match_rate = 0.7 # lower = more lenient
-        self.indent_width = 0.1 # indent width as % of contour width
+        self.indent_width = 0.025 # indent width as % of contour width
 
         # percent of image width and height to add to bounding box width and height of contours (improves ocr accuracy)
         # higher = bigger bounding box

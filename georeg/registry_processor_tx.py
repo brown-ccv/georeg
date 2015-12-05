@@ -78,14 +78,15 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
                 left_aligned = True # Assume contour starts unindented.
                 y_top = contour.y # Top of the contour split.
                 y_bottom = contour.y + contour.h # Bottom of the contour split.
+                x_indent = contour.x + (contour.w * self.indent_width) # indent x coord
 
                 for [[x, y]] in contour.data:
                     if left_aligned:
-                        if x > contour.x + contour.w * self.indent_width:
+                        if x > x_indent:
                             # Mark that coordinates are indented.
                             left_aligned = False
                     else:
-                        if x <= contour.x + contour.w * self.indent_width:
+                        if x <= x_indent:
                             # Mark that coordinates no longer indented.
                             left_aligned = True
                             # Set y as bottom of block.
@@ -117,14 +118,11 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
     def __init__(self, *args, **kwargs):
         super(RegistryProcessor1975, self).__init__(*args, **kwargs)
          
-        self.current_city = ""
-
-        self.city_pattern = re.compile(r'([^0-9])')
+        self.city_pattern = re.compile(r'([^a-z]+)[^0-9]+')
         self.registry_pattern = re.compile(r'[0-9]+')
         self.name_pattern_1 = re.compile(r'.*(Inc|Co|Corp|Ltd|Mfg)\s*\.\s*(?=,)')
         self.name_pattern_2 = re.compile(r'.*(?=,\s*[0-9])')
         self.address_pattern = re.compile(r'(\d.*?)(\(.*?\))')
-        self.city_pattern = re.compile(r'([^0-9])')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _parse_registry_block(self, registry_txt):
@@ -153,8 +151,12 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         # Find SIC matches.
         sic_matches = self.sic_pattern.findall(registry_txt)
         for desc, num in sic_matches:
-            business.category = num
-            business.cat_desc = desc
+            business.category.append(num)
+            business.cat_desc.append(desc)
+
+        # Append the current city. Strip the last character because the regex 
+        # matches to the start of the following word.
+        business.city = self.current_city[:-1] 
 
         return business
 
