@@ -401,24 +401,27 @@ class RegistryProcessor1999(RegistryProcessorTX):
         return business
                                                  
 
-class RegistryProcessor2000s(RegistryProcessorTX):
-    """2000-2009 TX registry parser."""
+class RegistryProcessor2005(RegistryProcessorTX):
+    """2005 TX registry parser."""
 
     def __init__(self, *args, **kwargs):
-        super(RegistryProcessor200s, self).__init__(*args, **kwargs)
-         
+        super(RegistryProcessor2005, self).__init__(*args, **kwargs)
+        
+        self.current_city = ""
+
         # regex patterns to parse blocks
-        self.city_pattern = re.compile(r'{A-Za-z\s]+\n\(.*\)')
-        self.registry_pattern = re.compile(r'.*\n.*[0-9]')
-        self.sic_pattern = re.compile(r'SIC-([/d]{4}\;)+')
-        self.naics_pattern = re.compile(r'NAICS-([/d]{6}\;)+')
-        self.emp_pattern = re.compile(r'Employs-([/d]+),')
+        self.city_pattern = re.compile(r'([^0-9]+)')
+        #self.pop_pattern = re.compile(r'\(.*Pop.\s+[\d,]+\)')
+        self.registry_pattern = re.compile(r'Phone')
+        self.sic_pattern = re.compile(r'SIC-(.*)NAICS')
+        #self.naics_pattern = re.compile(r'NAICS\-([0-9\s:;]+)')
+        self.emp_pattern = re.compile(r'Employs-([/d]+)')
         self.sales_pattern = re.compile(r'Sales-(.*)')
         self.address_pattern = re.compile(r'(.*)\((.*)\)')
-        self.cat_desc_pattern = re.compile(r'[/d]{6}\;(.*)')
-
+        self.cat_desc_pattern = re.compile(r'NAICS-\d+;(.*)')
+        
     def _parse_registry_block(self, registry_txt):
-        """works for registries from 2000-2010"""
+        """works for registries from 2005"""
 
         business = reg.Business()
 
@@ -429,7 +432,7 @@ class RegistryProcessor2000s(RegistryProcessorTX):
         full_address = ""
         for line in lines:
             start = re.search(r'[0-9]+', line)
-            end = re.search(r'Phone')
+            end = re.search(r'Phone', line)
             if start:
                 if end:
                     break
@@ -442,11 +445,10 @@ class RegistryProcessor2000s(RegistryProcessorTX):
 
         cat_desc = ""
         for line in lines:
-            start = re.search(r'SIC-', line)
-            end = re.search(r'Employs')
-            if start:
-                if end:
-                    break
+            end = re.search(r'Employs', line)
+            if end:
+                break
+            else:
                 cat_desc += line
 
         match = self.cat_desc_pattern.search(cat_desc)
@@ -457,9 +459,9 @@ class RegistryProcessor2000s(RegistryProcessorTX):
         if match:
             business.category = match.group(1)
 
-        match = self.naics_pattern.search(registry_txt)
-        if match:
-            business.new_cat = match.group(1)
+        #match = self.naics_pattern.search(registry_txt)
+        #if match:
+        #    business.new_cat = match.group(1)
     
         match = self.emp_pattern.search(registry_txt)
         if match:
