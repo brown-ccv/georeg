@@ -188,42 +188,9 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         return business
 
-    # IMPORTANT NOTE: this function will need to be reworked if it needs to be used on registry formats
-    # that have more than 2 columns per page
-    def _find_headers(self, contours, column_locations, page_boundary):
+    def _find_headers(self, header_contours, column_locations, page_boundary):
         """find business description headers in non-column contours
         (returns headers sorted by position)"""
-
-        header_contours = []
-        non_header_contours = []
-
-        # column locations used for finding headers
-        header_columns = []
-
-        # iterate through column pairs (mostly likely only one pair per page)
-        for i in range(0, len(column_locations) / 2):
-            left_column = column_locations[i*2]
-            right_column = column_locations[i*2+1]
-
-            # create an intermediate column representing the whitespace
-            # between the left and right columns of this page
-            header_columns.append(reg.Column_Location())
-            header_columns[-1].x = ((left_column.x + left_column.w / 2) + (right_column.x - right_column.w / 2)) / 2
-            header_columns[-1].w = (right_column.x - right_column.w / 2) - (left_column.x + left_column.w / 2)
-
-        # sometimes there are no header columns when the image is too blurry
-        # and very little text makes it through the threshold operation
-        if len(header_columns) == 0:
-            raise reg.RegistryProcessorException("unable to detect business category headers")
-
-        # assign contours to columns (or designate as headers)
-        for c in contours:
-            # check if it matches either header column
-            if header_columns[0].match_ratio(c) >= self.match_rate or \
-            (len(header_columns) > 1 and header_columns[1].match_ratio(c) >= self.match_rate):
-                header_contours.append(c)
-            else:
-                non_header_contours.append(c)
 
         # remove noise from headers
         highest_width = reduce(lambda h_w, hdr: max([h_w, hdr.w]), header_contours, 0)
@@ -240,27 +207,32 @@ class RegistryProcessorOld(reg.RegistryProcessor):
         if self.draw_debug_images:
             canvas = self._thresh.copy()
             for c in header_contours:
-                cv2.circle(canvas,(c.x_mid,c.y_mid),20,(255,255,255),35)
+                cv2.circle(canvas,(c.x_mid,c.y_mid),20,(255,0,0),35)
             cv2.imwrite("headers.tiff", canvas)
 
-        return header_contours, non_header_contours
+        return header_contours
 
     def _sort_business_group_contours(self, contours):
         """sort all registry contours in the image based on their business group and position"""
 
-        column_locations, page_boundary = self._find_column_locations(contours)
+        clustering = self._find_column_locations(contours)
+        column_locations = clustering.cluster_centers_
+
+        # calculate page boundary
+        page_boundary = -1
+        if self.pages_per_image == 2: # if there are two pages find the page boundary
+            sorted_cols = sorted(column_locations)
+            page_boundary = (sorted_cols[self.columns_per_page - 1][0] +
+                             sorted_cols[self.columns_per_page][0]) / (2 * 1.0)
 
         on_first_page = lambda c: page_boundary == -1 or c.x < page_boundary
         on_same_page = lambda c1,c2: on_first_page(c1) == on_first_page(c2)
 
         # seperate headers from columns
-        header_contours, non_header_contours = self._find_headers(contours, column_locations, page_boundary)
-        column_contours, _ = self._assemble_contour_columns(non_header_contours, column_locations)
+        column_contours, non_column_contours = self._assemble_contour_columns(contours, clustering)
+        header_contours = self._find_headers(non_column_contours, column_locations, page_boundary)
 
         business_groups = []
-
-        # # number of header segments encountered in a row
-        # num_header_segments = 0
 
         # put non-headers (business registries) into business groups
         for i, header in enumerate(header_contours):
@@ -291,17 +263,6 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                 for registry in column:
                     if registry.y > header.y and (not nxt_hdr_on_same_page or registry.y < next_header.y):
                         bus_group_columns[i].append(registry)
-
-            # # if this business group contained no registries it is likely
-            # # that we got one piece of a segmented header
-            # if len(bus_group_columns[0]) == 0 and len(bus_group_columns[1]) == 0:
-            #     num_header_segments += 1
-            #     continue
-            # elif num_header_segments > 0:
-            #     new_header_str = ""
-            #
-            #     for x in len(-num_header_segments,0):
-            #         header_strings
 
             business_groups.append(itertools.chain.from_iterable(bus_group_columns))
 

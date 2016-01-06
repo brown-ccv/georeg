@@ -399,22 +399,14 @@ class RegistryProcessor(object):
         num_cols = self.columns_per_page * self.pages_per_image
         k_means = KMeans(n_clusters=num_cols, random_state=self.seed)
         clustering = k_means.fit(coords_arr)
-        column_locations = clustering.cluster_centers_
-
-        # calculate page boundary
-        page_boundary = -1
-        if self.pages_per_image == 2: # if there are two pages find the page boundary
-            sorted_cols = sorted(column_locations)
-            page_boundary = (sorted_cols[self.columns_per_page - 1][0] +
-                             sorted_cols[self.columns_per_page][0]) / (2 * 1.0)
 
         # draw columns lines
         if self.draw_debug_images:
             canvas = self._thresh.copy()
             grey = (150,150,150)
 
-            # draw column lines
-            for column_l in column_locations:
+            # use left and right coords of clusters to draw columns
+            for column_l in clustering.cluster_centers_:
                 left, right = int(column_l[0]), int(column_l[1])
                 cv2.line(canvas,(left, 0),(left, self._image_height()),grey,20)
                 cv2.line(canvas,(right, 0),(right, self._image_height()),grey,20)
