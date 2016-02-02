@@ -8,18 +8,15 @@ import registry_processor as reg
 import business_geocoder as geo
 
 
-def generate_contour(x1, x2, y1, y2):
-    """Generate rectangular Contour object from four corners."""
+def generate_rect(x1, x2, y1, y2):
+    """Generate rectangular coords from four corners."""
 
-    # Set coordinates of rectangle.
-    coords = np.array([
+    return np.array([
         [[x1, y1]],
         [[x1, y2]],
         [[x2, y2]],
         [[x2, y1]]
     ])
-
-    return reg.Contour(coords)
 
 
 class RegistryProcessorTX(reg.RegistryProcessor):
@@ -61,55 +58,52 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
                                            h + int(round(self._image_height() * self.bb_expansion_percent / 2.0)))
                                                
 
-    def _assemble_contour_columns(self, contours, column_locations):
-        """Separate contours that fit into columns from those that don't,
-        splitting column contours based on hanging indents."""
+    def _get_contours(self, *args, **kwargs):
+        """Extract contours from the image, then split contours based on 
+        hanging indents."""
 
-        column_contours, non_column_contours = super(
-                RegistryProcessorOldTX, self)._assemble_contour_columns(contours, 
-                                                                        column_locations)
+        image, contours, hierarchy = super(RegistryProcessorOldTX,
+                                           self)._get_contours(*args, **kwargs)
 
         split_contours = []
 
-        for i, column in enumerate(column_contours):
-            split_contours.append([])
+        for c in contours:
+            contour = reg.Contour(c)
+            left_aligned = True # Assume contour starts unindented.
+            y_top = contour.y # Top of the contour split.
+            y_bottom = contour.y + contour.h # Bottom of the contour split.
+            x_indent = contour.x + (contour.w * self.indent_width) # indent x coord
 
-            for contour in column:
-                left_aligned = True # Assume contour starts unindented.
-                y_top = contour.y # Top of the contour split.
-                y_bottom = contour.y + contour.h # Bottom of the contour split.
-                x_indent = contour.x + (contour.w * self.indent_width) # indent x coord
+            for [[x, y]] in contour.data:
+                if left_aligned:
+                    if x > x_indent:
+                        # Mark that coordinates are indented.
+                        left_aligned = False
+                else:
+                    if x <= x_indent:
+                        # Mark that coordinates no longer indented.
+                        left_aligned = True
+                        # Set y as bottom of block.
+                        y_bottom = y
+                        # Create rect from last block to this one.
+                        rect = generate_rect(contour.x, 
+                                             contour.x + contour.w,
+                                             y_top,
+                                             y_bottom)
+                        # Append to contours.
+                        split_contours.append(rect)
+                        # Set y as top of next block.
+                        y_top = y
 
-                for [[x, y]] in contour.data:
-                    if left_aligned:
-                        if x > x_indent:
-                            # Mark that coordinates are indented.
-                            left_aligned = False
-                    else:
-                        if x <= x_indent:
-                            # Mark that coordinates no longer indented.
-                            left_aligned = True
-                            # Set y as bottom of block.
-                            y_bottom = y
-                            # Create rect from last block to this one.
-                            c = generate_contour(contour.x, 
-                                                 contour.x + contour.w,
-                                                 y_top,
-                                                 y_bottom)
-                            # Append to contours.
-                            split_contours[i].append(c)
-                            # Set y as top of next block.
-                            y_top = y
+            # Add a contour split from the last top coord to the bottom of
+            # the contour.
+            rect = generate_rect(contour.x, 
+                                 contour.x + contour.w,
+                                 y_top,
+                                 contour.y + contour.h)
+            split_contours.append(rect)
 
-                # Add a contour split from the last top coord to the bottom of
-                # the contour.
-                c = generate_contour(contour.x, 
-                                     contour.x + contour.w,
-                                     y_top,
-                                     contour.y + contour.h)
-                split_contours[i].append(c)
-
-        return split_contours, non_column_contours
+        return image, split_contours, hierarchy
 
 class RegistryProcessor1970(RegistryProcessorOldTX):
     """1970 TX registry parser."""
