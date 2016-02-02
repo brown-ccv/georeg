@@ -61,14 +61,6 @@ class Business:
         self.long = ""
         self.confidence_score = 0.0
 
-        self.manual_inspection = False
-
-    def manual_inspection_test(self):
-        # if the geocoder is 0% confident or there is no SIC code, mark for manual inspection
-        if not self.confidence_score or not len(self.category):
-            return True
-        return False
-
 class Contour:
     def __init__(self, contour = None):
         self.data = contour
@@ -213,15 +205,12 @@ class RegistryProcessor(object):
 
         self.businesses = [] # reset businesses list
 
-        manual_inspec_path = os.path.splitext(path)[0] + "_manual_inspection.tsv"
-
-        # mini function for loading an individual business file (normal or manual inspection)
-        def load_businesses(path, manual_inspection):
+        # mini function for loading an individual business file
+        def load_businesses(path):
             with open(path, "r") as file:
                 file_reader = csv.reader(file, delimiter="\t")
                 for row in file_reader:
                     business = Business()
-                    business.manual_inspection = manual_inspection
 
                     [business.category, business.name, business.city,
                      business.address, business.zip, business.emp,
@@ -235,37 +224,16 @@ class RegistryProcessor(object):
         # load normal businesses
         load_businesses(path, False)
 
-        # load manual inspection businesses
-        if os.path.isfile(manual_inspec_path):
-            load_businesses(manual_inspec_path, True)
-
     def record_to_tsv(self, path, mode = 'w'):
         """record business registries to tsv, opened with file access mode: mode"""
 
         with open(path, mode) as file:
             file_writer = csv.writer(file, delimiter ="\t")
 
-            # open a file for dumping registries that require manual inspection
-            manual_inspec_path = os.path.splitext(path)[0] + "_manual_inspection.tsv"
-            manual_inspection_file = None
-            manual_inspection_writer = None
-
             for business in self.businesses:
                 entry = [business.category, business.name, business.address, business.city, business.zip, business.emp, business.sales, business.cat_desc, business.bracket, business.lat, business.long, business.confidence_score]
 
-                business.manual_inspection = business.manual_inspection_test()
-
-                if business.manual_inspection:
-                    # if manual inspection file not opened yet open now
-                    if not manual_inspection_file:
-                        manual_inspection_file = open(manual_inspec_path, mode)
-                        manual_inspection_writer = csv.writer(manual_inspection_file, delimiter="\t")
-
-                    manual_inspection_writer.writerow(entry)
-                else: file_writer.writerow(entry)
-
-            if manual_inspection_file:
-                manual_inspection_file.close()
+                file_writer.writerow(entry)
 
     def load_settings_from_cfg(self, path):
         # Set default values.
