@@ -76,6 +76,8 @@ class RegistryProcessorOld(reg.RegistryProcessor):
         self.current_city = ""
         self.current_zip = ""
 
+        self.line_color = (130,130,130)
+
     def _process_image(self, path):
         """process a registry image from 1953-1975"""
 
@@ -92,7 +94,8 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         if self.draw_debug_images:
             canvas = np.zeros(self._image.shape,self._image.dtype)
-            cv2.drawContours(canvas,[c.data for c in contours],-1,(255,255,255),-1)
+            cv2.drawContours(canvas,[c.data for c in
+                contours],-1,self.line_color,-1)
             cv2.imwrite("closed.tiff",canvas)
 
         business_groups = self._sort_business_group_contours(contours)
@@ -111,7 +114,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
             if self.draw_debug_images:
                 # draw bounding box on original image
-                cv2.rectangle(contoured,(x,y),(x+w,y+h),(255,0,255),5)
+                cv2.rectangle(contoured,(x,y),(x+w,y+h),self.line_color,5)
 
             header_crop = self._thresh[y:y+h, x:x+w]
             header_str = self._ocr_image(header_crop)
@@ -124,7 +127,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
                 if self.draw_debug_images:
                     # draw bounding box on original image
-                    cv2.rectangle(contoured,(x,y),(x+w,y+h),(255,0,255),5)
+                    cv2.rectangle(contoured,(x,y),(x+w,y+h),self.line_color,5)
 
                 # ocr the contour
                 cropped = self._thresh[y:y+h, x:x+w]
@@ -207,7 +210,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
         if self.draw_debug_images:
             canvas = self._thresh.copy()
             for c in header_contours:
-                cv2.circle(canvas,(c.x_mid,c.y_mid),20,(255,0,0),35)
+                cv2.circle(canvas,(c.x_mid,c.y_mid),20,self.line_color,35)
             cv2.imwrite("headers.tiff", canvas)
 
         return header_contours

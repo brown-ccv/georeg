@@ -55,6 +55,7 @@ class Business:
         self.sales = ""
         self.cat_desc = []
         self.bracket = ""
+        self.line_color = (130,130,130)
 
         # coordinates
         self.lat = ""
@@ -167,7 +168,8 @@ class RegistryProcessor(object):
 
         if self.draw_debug_images:
             canvas = np.zeros(self._image.shape,self._image.dtype)
-            cv2.drawContours(canvas,[c.data for c in contours],-1,(255,255,255),-1)
+            cv2.drawContours(canvas,[c.data for c in
+                contours],-1,self.line_color,-1)
             cv2.imwrite("closed.tiff",canvas)
 
         clustering = self._find_column_locations(contours)
@@ -184,7 +186,7 @@ class RegistryProcessor(object):
 
             if self.draw_debug_images:
                 # draw bounding box on original image
-                cv2.rectangle(contoured,(x,y),(x+w,y+h),(255,0,255),5)
+                cv2.rectangle(contoured,(x,y),(x+w,y+h),self.line_color,5)
 
             cropped = self._thresh[y:y+h, x:x+w]
             contour_txt = self._ocr_image(cropped)
@@ -370,13 +372,14 @@ class RegistryProcessor(object):
         # draw columns lines
         if self.draw_debug_images:
             canvas = self._thresh.copy()
-            grey = (150,150,150)
 
             # use left and right coords of clusters to draw columns
             for column_l in clustering.cluster_centers_:
                 left, right = int(column_l[0]), int(column_l[1])
-                cv2.line(canvas,(left, 0),(left, self._image_height()),grey,20)
-                cv2.line(canvas,(right, 0),(right, self._image_height()),grey,20)
+                cv2.line(canvas,(left, 0),(left,
+                    self._image_height()),self.line_color,20)
+                cv2.line(canvas,(right, 0),(right,
+                    self._image_height()),self.line_color,20)
 
             # draw column lines to file
             cv2.imwrite("column_lines.tiff", canvas)
