@@ -171,10 +171,11 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         self.registry_pattern = re.compile(r'[0-9]+')
         self.name_pattern_1 = re.compile(r'.*(Inc|Co|Corp|Ltd|Mfg)\s*\.\s*(?=,)')
         self.name_pattern_2 = re.compile(r'.*(?=,\s*[0-9])')
-        self.address_pattern = re.compile(r'(\d.*?)(\(.*?\))')
-        self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
-        self.bracket_pattern = re.compile(r'\[(.*)\]')
-
+        #self.address_pattern = re.compile(r'(\d.*?)(\(\d{5}\))')
+        self.address_pattern = re.compile(r'(\d+\s+[A-Za-z]+.*?),.*\((\d{5})\)')
+        self.sic_pattern = re.compile(r'([^\.]+)\((\d{4})\)')
+        self.bracket_pattern = re.compile(r'\[(.*?)\]')
+    
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
 
@@ -196,6 +197,7 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         address_match = re.search(self.address_pattern, registry_txt)
         if address_match:
             business.address = address_match.group(1)
+            business.zip = address_match.group(2)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
         # Find SIC matches.
@@ -515,7 +517,7 @@ class RegistryProcessor2005(RegistryProcessorTX):
         self.sic_pattern = re.compile(r'SIC-(.*)NAICS')
         self.emp_pattern = re.compile(r'Employs-(\d+)')
         self.sales_pattern = re.compile(r'Sales-(.*)')
-        self.address_pattern = re.compile(r'(.*)\((.*)\)')
+        self.address_pattern = re.compile(r'(.*?)\((.*?)\)')
         self.cat_desc_pattern = re.compile(r'NAICS-[\d:;\s]+(.*)')
         
     def _parse_registry_block(self, registry_txt):
@@ -555,24 +557,17 @@ class RegistryProcessor2005(RegistryProcessorTX):
         cat_desc_match = self.cat_desc_pattern.search(cat_desc)
         if cat_desc_match:
             business.cat_desc = cat_desc_match.group(1)
-        else: business.cat_desc = "No Category Description Match"
 
         sic_match = self.sic_pattern.search(registry_txt)
         if sic_match:
             business.category = sic_match.group(1)
-        else:
-            business.category = "No sic match"
 
         emp_match = self.emp_pattern.search(registry_txt)
         if emp_match:
             business.emp = emp_match.group(1)
-        else:
-            business.emp = "No Employee match"
 
         sales_match = self.sales_pattern.search(registry_txt)
         if sales_match:
             business.sales = sales_match.group(1)
-        else:
-            business.sales = "no sales match"
 
         return business
