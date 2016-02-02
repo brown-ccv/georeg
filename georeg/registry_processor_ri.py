@@ -81,7 +81,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         self.businesses = [] # reset businesses list
 
-        self._image = cv2.imread(path)
+        self._image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
         _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
         contours = [reg.Contour(c) for c in contours]
