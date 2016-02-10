@@ -63,6 +63,7 @@ reg_processor = RegistryProcessor(args.state, args.year)
 
 reg_processor.draw_debug_images = args.debug
 reg_processor.assume_pre_processed = args.pre_processed
+reg_processor.debugdir = args.outdir
 
 if args.append:
     mode = 'a'
