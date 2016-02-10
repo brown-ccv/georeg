@@ -55,7 +55,6 @@ class Business:
         self.sales = ""
         self.cat_desc = []
         self.bracket = ""
-        self.line_color = (130,130,130)
 
         # coordinates
         self.lat = ""
@@ -117,6 +116,7 @@ class RegistryProcessor(object):
 
         self.draw_debug_images = False # turning this on can help with debugging
         self.assume_pre_processed = False # assume images are preprocessed so to not waste extra computational power
+        self.line_color = (130,130,130) # NOTE: line color for debug images, must be visible in grayscale
 
         self.businesses = []
         self.__tmp_path = tempfile.mktemp(suffix=".tiff")
