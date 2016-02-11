@@ -49,15 +49,6 @@ class RegistryProcessorTX(reg.RegistryProcessor):
 class RegistryProcessorOldTX(RegistryProcessorTX):
     """Base class for parsing TX registries from 1985 and earlier."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessorOldTX, self).__init__(*args, **kwargs)
-         
-        self._expand_bb = lambda x,y,w,h: (x - int(round(self._image_width() * self.bb_expansion_percent / 2.0)), \
-                                           y - int(round(self._image_height() * self.bb_expansion_percent / 2.0)), \
-                                           w + int(round(self._image_width() * self.bb_expansion_percent / 2.0)), \
-                                           h + int(round(self._image_height() * self.bb_expansion_percent / 2.0)))
-                                               
-
     def _get_contours(self, *args, **kwargs):
         """Extract contours from the image, then split contours based on 
         hanging indents."""
@@ -111,13 +102,33 @@ class RegistryProcessor1970(RegistryProcessorOldTX):
     def __init__(self, *args, **kwargs):
         super(RegistryProcessor1970, self).__init__(*args, **kwargs)
          
-        self.city_pattern = re.compile(r'([^a-z]+)[0-9]+[A-Za-z ]+County')
-        self.registry_pattern = re.compile(r'[()]+')
-        self.name_pattern_1 = re.compile(r'.*(Inc|Co|Corp|Ltd|Mfg)\s*\.\s*(?=,)')
-        self.name_pattern_2 = re.compile(r'(.*),')
-        self.address_pattern = re.compile(r'(.*?)(\(.*?\))')
+        self.current_zip = ""
+        self.city_pattern = re.compile(r'(^[A-Z\s]+)(\d{5})\s+[A-Za-z\s]+County$')
+        self.registry_pattern = re.compile(r'[()]')
+        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
+        self.name_pattern_2 = re.compile(r'(.+?),')
+        self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
-        self.bracket_pattern = re.compile(r'\[(.*)\]')
+
+    def _process_contour(self, contour_txt):
+        registry_match = self.registry_pattern.search(contour_txt)
+        city_match = self.city_pattern.search(contour_txt)
+
+        if registry_match:
+            business = self._parse_registry_block(contour_txt)
+            
+            if business.address:
+                try:
+                    geo.geocode_business(business, self.state)
+                except:
+                    print("Unable to geocode: %s" % business.address)
+
+            self.businesses.append(business)
+
+        elif city_match:
+            self.current_city = city_match.group(1).strip()
+            self.current_zip = city_match.group(2)
+
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -136,10 +147,11 @@ class RegistryProcessor1970(RegistryProcessorOldTX):
             # Set to entire first line if no match found.
             business.name = lines[0]
 
-        # Find address match.
+        # Find address and bracket matches.
         address_match = re.search(self.address_pattern, registry_txt)
         if address_match:
             business.address = address_match.group(1)
+            business.bracket = address_match.group(2)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
         # Find SIC matches.
@@ -148,14 +160,9 @@ class RegistryProcessor1970(RegistryProcessorOldTX):
             business.category.append(num)
             business.cat_desc.append(desc)
         
-        # Find bracket matches.
-        bracket_match = re.search(self.bracket_pattern, registry_txt)
-        if bracket_match:
-            business.bracket = bracket_match.group(1)
-
-        # Append the current city. Strip the last character because the regex 
-        # matches to the start of the following word.
-        business.city = self.current_city[:-1] 
+        # Append the current city and zip.
+        business.city = self.current_city
+        business.zip = self.current_zip
 
         return business
 
