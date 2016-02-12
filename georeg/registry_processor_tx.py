@@ -111,22 +111,10 @@ class RegistryProcessor1970(RegistryProcessorOldTX):
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _process_contour(self, contour_txt):
-        registry_match = self.registry_pattern.search(contour_txt)
+        super(RegistryProcessor1970, self)._process_contour(contour_txt)
+
         city_match = self.city_pattern.search(contour_txt)
-
-        if registry_match:
-            business = self._parse_registry_block(contour_txt)
-            
-            if business.address:
-                try:
-                    geo.geocode_business(business, self.state)
-                except:
-                    print("Unable to geocode: %s" % business.address)
-
-            self.businesses.append(business)
-
-        elif city_match:
-            self.current_city = city_match.group(1).strip()
+        if city_match:
             self.current_zip = city_match.group(2)
 
 
