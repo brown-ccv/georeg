@@ -435,9 +435,10 @@ class RegistryProcessor(object):
             column_contours.append(keep_contours)
 
         # sort column and contour by position
-        sorted_contours = sorted(enumerate(column_contours),key=lambda x: 
+        sorted_column_contours = []
+        sorted_columns = sorted(enumerate(column_contours),key=lambda x: 
                                  clustering.cluster_centers_[x[0]][0])
-        for i, column in sorted_contours:
-            column_contours[i] = sorted(column,key=attrgetter('y'))
+        for i, column in sorted_columns:
+            sorted_column_contours.append(sorted(column,key=attrgetter('y')))
 
-        return column_contours, non_column_contours
+        return sorted_column_contours, non_column_contours
