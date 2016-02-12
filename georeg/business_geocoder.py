@@ -18,6 +18,7 @@ def geocode_business(business, state = 'RI'):
     if location:
         match = location[0]
         business.confidence_score = float(match[0])
+        business.clean_addr(match[1])
         business.lat = match[2]
         business.long = match[3]
 

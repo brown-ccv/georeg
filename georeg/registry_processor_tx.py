@@ -104,7 +104,7 @@ class RegistryProcessor1970(RegistryProcessorOldTX):
          
         self.current_zip = ""
         self.city_pattern = re.compile(r'(^[A-Z\s]+)(\d{5})\s+[A-Za-z\s]+County$')
-        self.registry_pattern = re.compile(r'[()]')
+        self.registry_pattern = re.compile(r'[\[\]()]')
         self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
         self.name_pattern_2 = re.compile(r'(.+?),')
         self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
