@@ -116,10 +116,10 @@ class RegistryProcessor(object):
         # higher = bigger bounding box
         self.bb_expansion_percent = 0.012
 
-        self._expand_bb = lambda x,y,w,h: (x - int(round(self._image_width() * self.bb_expansion_percent)), \
-                                           y - int(round(self._image_height() * self.bb_expansion_percent)), \
-                                           w + int(round(self._image_width() * self.bb_expansion_percent)), \
-                                           h + int(round(self._image_height() * self.bb_expansion_percent)))
+        self._expand_bb = lambda x,y,w,h: (x - int(self._image_width() * self.bb_expansion_percent / 2), \
+                                           y - int(self._image_height() * self.bb_expansion_percent / 2), \
+                                           w + int(self._image_width() * self.bb_expansion_percent / 2), \
+                                           h + int(self._image_height() * self.bb_expansion_percent / 2))
 
         self.columns_per_page = 2
         self.pages_per_image = 1

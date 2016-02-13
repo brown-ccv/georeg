@@ -60,39 +60,38 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
 
         for c in contours:
             contour = reg.Contour(c)
-            left_aligned = True # Assume contour starts unindented.
+            left_aligned = False
             y_top = contour.y # Top of the contour split.
             y_bottom = contour.y + contour.h # Bottom of the contour split.
+            y_max = y_bottom - 1
             x_indent = contour.x + (contour.w * self.indent_width) # indent x coord
+            x_max = contour.x + contour.w
+            start_splits = False # don't start contour splits until hitting a left indent
 
+            # assumes counter-clockwise movement from top-left
             for [[x, y]] in contour.data:
+                if y == y_max:
+                    # add contour from the last top coord to bottom of contour
+                    rect = generate_rect(contour.x, x_max, y_top, y_max)
+                    split_contours.append(rect)
+                    break
                 if left_aligned:
+                    start_splits = True
                     if x > x_indent:
                         # Mark that coordinates are indented.
                         left_aligned = False
-                else:
-                    if x <= x_indent:
-                        # Mark that coordinates no longer indented.
-                        left_aligned = True
+                elif x <= x_indent:
+                    # Mark that coordinates no longer indented.
+                    left_aligned = True
+                    if start_splits:
                         # Set y as bottom of block.
                         y_bottom = y
                         # Create rect from last block to this one.
-                        rect = generate_rect(contour.x, 
-                                             contour.x + contour.w,
-                                             y_top,
-                                             y_bottom)
+                        rect = generate_rect(contour.x, x_max, y_top, y_bottom)
                         # Append to contours.
                         split_contours.append(rect)
                         # Set y as top of next block.
                         y_top = y
-
-            # Add a contour split from the last top coord to the bottom of
-            # the contour.
-            rect = generate_rect(contour.x, 
-                                 contour.x + contour.w,
-                                 y_top,
-                                 contour.y + contour.h)
-            split_contours.append(rect)
 
         return image, split_contours, hierarchy
 
@@ -162,15 +161,14 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
     def __init__(self, *args, **kwargs):
         super(RegistryProcessor1975, self).__init__(*args, **kwargs)
          
-        self.city_pattern = re.compile(r'([^a-z]+)[^0-9]+')
-        self.registry_pattern = re.compile(r'[0-9]+')
-        self.name_pattern_1 = re.compile(r'.*(Inc|Co|Corp|Ltd|Mfg)\s*\.\s*(?=,)')
-        self.name_pattern_2 = re.compile(r'.*(?=,\s*[0-9])')
-        #self.address_pattern = re.compile(r'(\d.*?)(\(\d{5}\))')
-        self.address_pattern = re.compile(r'(\d+\s+[A-Za-z]+.*?),.*\((\d{5})\)')
-        self.sic_pattern = re.compile(r'([^\.]+)\((\d{4})\)')
-        self.bracket_pattern = re.compile(r'\[(.*?)\]')
-    
+        self.city_pattern = re.compile(r'(^[A-Z\s]+)(\d{5})\s+[A-Za-z\s]+County$')
+        self.registry_pattern = re.compile(r'[\[\]()]')
+        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
+        self.name_pattern_2 = re.compile(r'(.+?),')
+        self.address_pattern = re.compile(r'(.+?)\(.*(\d{5})\)\s*\[(.*)\]')
+        self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
+
+
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
 
@@ -193,6 +191,7 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         if address_match:
             business.address = address_match.group(1)
             business.zip = address_match.group(2)
+            business.bracket = address_match.group(3)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
         # Find SIC matches.
@@ -201,14 +200,8 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
             business.category.append(num)
             business.cat_desc.append(desc)
 
-        # Find bracket matches.
-        bracket_match = re.search(self.bracket_pattern, registry_txt)
-        if bracket_match:
-            business.bracket = bracket_match.group(1)
-        
-        # Append the current city. Strip the last character because the regex 
-        # matches to the start of the following word.
-        business.city = self.current_city[:-1] 
+        # Append the current city.
+        business.city = self.current_city
 
         return business
 
