@@ -149,11 +149,61 @@ class RegistryProcessor1950s(RegistryProcessorOldTX):
 
         return business
 
-class RegistryProcessor1970(RegistryProcessorOldTX):
-    """1970 TX registry parser."""
+
+class RegistryProcessor1960(RegistryProcessorOldTX):
+    """1960 TX registry parser."""
 
     def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1970, self).__init__(*args, **kwargs)
+        super(RegistryProcessor1960, self).__init__(*args, **kwargs)
+         
+        self.city_pattern = re.compile(r'^([A-Z\s]+),?\s*([A-Za-z\s]+Metropolitan\s*Area)?\.?$')
+        self.registry_pattern = re.compile(r'[\[\]()]')
+        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
+        self.name_pattern_2 = re.compile(r'(.+?),')
+        self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
+        self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
+
+    def _parse_registry_block(self, registry_txt):
+        business = reg.Business()
+
+        lines = registry_txt.split('\n')
+        registry_txt = registry_txt.replace('\n', '')
+
+        # Look for name match in first line.
+        name_match = re.match(self.name_pattern_1, lines[0])
+        if not name_match:
+            name_match = re.match(self.name_pattern_2, lines[0])
+        if name_match:
+            business.name = name_match.group(0)
+            registry_txt = re.sub(re.escape(business.name), '', registry_txt)
+        else:
+            # Set to entire first line if no match found.
+            business.name = lines[0]
+
+        # Find address and bracket matches.
+        address_match = re.search(self.address_pattern, registry_txt)
+        if address_match:
+            business.address = address_match.group(1)
+            business.bracket = address_match.group(2)
+            registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+
+        # Find SIC matches.
+        sic_matches = self.sic_pattern.findall(registry_txt)
+        for desc, num in sic_matches:
+            business.category.append(num)
+            business.cat_desc.append(desc)
+        
+        # Append the current city.
+        business.city = self.current_city
+
+        return business
+
+
+class RegistryProcessor1965(RegistryProcessorOldTX):
+    """1965 and 1970 TX registry parser."""
+
+    def __init__(self, *args, **kwargs):
+        super(RegistryProcessor1965, self).__init__(*args, **kwargs)
          
         self.current_zip = ""
         self.city_pattern = re.compile(r'(^[A-Z\s]+)(\d{5})\s+[A-Za-z\s]+County$')
@@ -164,7 +214,7 @@ class RegistryProcessor1970(RegistryProcessorOldTX):
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _process_contour(self, contour_txt):
-        super(RegistryProcessor1970, self)._process_contour(contour_txt)
+        super(RegistryProcessor1965, self)._process_contour(contour_txt)
 
         city_match = self.city_pattern.search(contour_txt)
         if city_match:
