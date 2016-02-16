@@ -10,7 +10,6 @@ import sys
 import subprocess
 import ConfigParser
 import itertools
-import usaddress
 from operator import itemgetter, attrgetter
 from sklearn.cluster import KMeans
 
@@ -61,17 +60,6 @@ class Business:
         self.lat = ""
         self.long = ""
         self.confidence_score = 0.0
-
-    def clean_addr(self, address):
-        """Tag address by components and rebuild address components."""
-        tags, _ = usaddress.tag(address)
-        if "StateName" in tags.iterkeys():
-            del tags["StateName"]
-        if "PlaceName" in tags.iterkeys():
-            self.city = tags.pop("PlaceName")
-        if "ZipCode" in tags.iterkeys():
-            self.zip = tags.pop("ZipCode")
-        self.addr = " ".join(t for t in tags.itervalues())
 
 
 class Contour:
