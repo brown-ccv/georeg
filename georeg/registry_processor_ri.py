@@ -20,7 +20,8 @@ class RegistryProcessorNew(reg.RegistryProcessor):
          
         self.current_sic = ""
 
-        self.city_pattern = re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2})')
+        self.city_pattern =
+        re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2}[\s]+[0-9]{5})')
         self.emp_pattern = re.compile(r'[Ee]mp.*\d+')
         self.registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
         self.sic_pattern = re.compile(r'\d{4}')
