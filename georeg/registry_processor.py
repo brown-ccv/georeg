@@ -2,7 +2,6 @@
 import cv2
 import numpy as np
 import tempfile
-import difflib
 import re
 import os
 import csv
@@ -10,6 +9,7 @@ import sys
 import subprocess
 import ConfigParser
 import itertools
+from fuzzywuzzy import fuzz, process
 from operator import itemgetter, attrgetter
 from sklearn.cluster import KMeans
 
@@ -30,18 +30,22 @@ class CityDetector:
                 line = line.strip()
                 self.city_list.append(line)
 
-    def match_to_cities(self, line, cutoff = 0.6):
+    def match_to_cities(self, line, cutoff=60):
         line = line.lower().strip()
 
         # '—' not easily expressed in ascii
         em_dash = '\xe2\x80\x94'
 
         # if the end of the string matches "—continued" then remove it
-        if len(difflib.get_close_matches(line[-12:], [em_dash + "continued"], cutoff=cutoff)) > 0:
+        if fuzz.ratio(line[-12:], em_dash + "continued") > cutoff:
             line = line[:-12]
 
-        match_list = difflib.get_close_matches(line, self.city_list, cutoff = cutoff)
-        return match_list
+        match, ratio = process.extractOne(line, self.city_list)
+
+        if ratio > cutoff:
+            return match
+        else:
+            return None
 
 class Business:
 

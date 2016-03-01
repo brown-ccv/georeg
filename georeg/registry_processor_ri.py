@@ -20,8 +20,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
          
         self.current_sic = ""
 
-        self.city_pattern =
-        re.compile(r'[A-Za-z]+[\s]{0,2}[A-Za-z]*(?=[,.][\s]+[A-Z]{2}[\s]+[0-9]{5})')
+        self.city_pattern = re.compile(r'[A-Za-z ]+(?=[,.][ ]+[A-Z]{2}[ ]+[0-9]{5})')
         self.emp_pattern = re.compile(r'[Ee]mp.*\d+')
         self.registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
         self.sic_pattern = re.compile(r'\d{4}')
@@ -52,9 +51,11 @@ class RegistryProcessorNew(reg.RegistryProcessor):
         match = self.city_pattern.search(registry_txt)
         if match:
             city = match.group(0)
-            matches = self._city_detector.match_to_cities(city) # perform spell check and confirm this is a city
-            if len(matches) > 0:
-                business.city = matches[0]
+            match_city = self._city_detector.match_to_cities(city) # perform spell check and confirm this is a city
+            if match_city:
+                if match_city != city:
+                    print("Imperfect city match: %s matched to %s" % (city, match_city))
+                business.city = match_city
 
         match = self.emp_pattern.search(registry_txt)
         if match:
@@ -153,10 +154,10 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                         zip = segments[2]
                         contour_txt = segments[0]
 
-                    matches = self._city_detector.match_to_cities(contour_txt)
+                    match_city = self._city_detector.match_to_cities(contour_txt)
 
-                    if len(matches) > 0:
-                        self.current_city = matches[0]
+                    if match_city:
+                        self.current_city = match_city
                         self.current_zip = zip
 
         if self.draw_debug_images:
