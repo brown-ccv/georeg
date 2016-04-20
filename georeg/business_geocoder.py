@@ -16,10 +16,10 @@ def geocode_business(business, state = 'RI'):
             state=state, zip_cd=business.zip, n_matches = 1, timeout = 10)
 
     if location:
-        match = location[0]
-        business.confidence_score = float(match[0])
-        business.lat = match[2]
-        business.long = match[3]
+        match = location["candidates"][0]["attributes"]
+        business.confidence_score = float(match["score"])
+        business.lat = match["location"]["y"]
+        business.long = match["location"]["x"]
 
     else: 
         print "Unsuccessful geo-query: %s, %s, %s, %s" % (business.address,
