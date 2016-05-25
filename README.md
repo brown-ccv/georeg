@@ -9,4 +9,4 @@
 
 # Test
 
-        georeg --year 1979 --state RI --images test/DSCN0766.JPG --outdir .
+        georeg --year 1979 --state RI --images test/img.png --outdir . --pre-processed

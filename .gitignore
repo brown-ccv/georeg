@@ -4,3 +4,4 @@ georeg.egg-info
 *.tsv
 *.swp
 *.pyc
+*.tiff
