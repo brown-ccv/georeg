@@ -246,7 +246,8 @@ class RegistryProcessor(object):
     def load_settings_from_cfg(self, path):
         # Set default values.
         cp = ConfigParser.ConfigParser({
-                'kernel_shape_x': str(self.kernel_shape),
+                'kernel_shape_x': str(self.kernel_shape[0]),
+                'kernel_shape_y': str(self.kernel_shape[1]),
                 'thresh_value': str(self.thresh_value),
                 'iterations': str(self.iterations),
                 'match_rate': str(self.match_rate),
