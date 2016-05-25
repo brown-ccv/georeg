@@ -376,20 +376,34 @@ class RegistryProcessor(object):
         k_means = KMeans(n_clusters=num_cols, random_state=self.seed)
         clustering = k_means.fit(coords_arr)
 
-        # draw columns lines
+        # draw columns lines and clusters
         if self.draw_debug_images:
-            canvas = self._thresh.copy()
+            # generate a different color for each cluster
+            cluster_colors = [[x]*3 for x in np.linspace(0,255,num=num_cols+2)[1:-1]]
 
             # use left and right coords of clusters to draw columns
-            for column_l in clustering.cluster_centers_:
+            canvas = self._thresh.copy()
+            for ix, column_l in enumerate(clustering.cluster_centers_):
                 left, right = int(column_l[0]), int(column_l[1])
                 cv2.line(canvas,(left, 0),(left,
-                    self._image_height()),self.line_color,20)
+                    self._image_height()),cluster_colors[ix],20)
                 cv2.line(canvas,(right, 0),(right,
-                    self._image_height()),self.line_color,20)
+                    self._image_height()),cluster_colors[ix],20)
 
             # draw column lines to file
             cv2.imwrite(os.path.join(self.debugdir, "column_lines.tiff"), canvas)
+
+            # draw contour widths in color of assigned cluster
+            canvas = self._thresh.copy()
+            for ix, contour in enumerate(contours):
+                col = cluster_colors[clustering.labels_[ix]]
+                left, right, y = contour.x, contour.x + contour.w, contour.y_mid
+                cv2.circle(canvas,(left, y),20,col,35)
+                cv2.circle(canvas,(right, y),20,col,35)
+                cv2.line(canvas,(left, y),(right, y),col,10)
+
+            # draw clustered column widths to file
+            cv2.imwrite(os.path.join(self.debugdir, "clusters.tiff"), canvas)
 
         return clustering
 
