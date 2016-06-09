@@ -8,12 +8,12 @@ geolocator = BrownArcGIS(username = os.environ.get("BROWNGIS_USERNAME"),
                          referer = os.environ.get("BROWNGIS_REFERER"))
 
 
-def geocode_business(business, state = 'RI'):
+def geocode_business(business, state = 'RI', timeout=60):
     """geocode a business object and store the results inside it,
     return confidence score"""
 
     location = geolocator.geocode(street=business.address, city=business.city,
-            state=state, zip_cd=business.zip, n_matches = 1, timeout = 10)
+            state=state, zip_cd=business.zip, n_matches = 1, timeout = timeout)
 
     if location:
         match = location["candidates"][0]["attributes"]
