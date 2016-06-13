@@ -19,5 +19,5 @@ setup(
     packages=["georeg", "brown_geopy"],
     package_data={"georeg": ['data/*.txt', 'configs/**/*.cfg']},
     scripts=["scripts/georeg"],
-    install_requires=['cv2', 'fuzzywuzzy', 'numpy', 'scikit-learn'],
+    install_requires=['fuzzywuzzy', 'numpy', 'scikit-learn'],
 )
