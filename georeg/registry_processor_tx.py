@@ -22,9 +22,9 @@ def generate_rect(x1, x2, y1, y2):
 class RegistryProcessorTX(reg.RegistryProcessor):
     """Base class for parsing TX registries."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessorTX, self).__init__(*args, **kwargs)
-         
+    def __init__(self):
+        super(RegistryProcessorTX, self).__init__()
+
         self.current_city = ""
 
     def _process_contour(self, contour_txt):
@@ -98,8 +98,8 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
 class RegistryProcessor1950s(RegistryProcessorOldTX):
     """1950s TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1950s, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1950s, self).__init__()
          
         self.city_pattern = re.compile(r'([^a-z]+)[0-9]+[A-Za-z ]+County')
         self.registry_pattern = re.compile(r'[()]+')
@@ -153,8 +153,8 @@ class RegistryProcessor1950s(RegistryProcessorOldTX):
 class RegistryProcessor1960(RegistryProcessorOldTX):
     """1960 TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1960, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1960, self).__init__()
          
         self.city_pattern = re.compile(r'^([A-Z\s]+),?\s*([A-Za-z\s]+Metropolitan\s*Area)?\.?$')
         self.registry_pattern = re.compile(r'[\[\]()]')
@@ -202,8 +202,8 @@ class RegistryProcessor1960(RegistryProcessorOldTX):
 class RegistryProcessor1965(RegistryProcessorOldTX):
     """1965 and 1970 TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1965, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1965, self).__init__()
          
         self.current_zip = ""
         self.city_pattern = re.compile(r'(^[A-Z\s]+)(\d{5})\s+[A-Za-z\s]+County$')
@@ -262,8 +262,8 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
 class RegistryProcessor1975(RegistryProcessorOldTX):
     """1975 TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1975, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1975, self).__init__()
          
         self.city_pattern = re.compile(r'(^[A-Z\s]+)(\d{5})\s+[A-Za-z\s]+County$')
         self.registry_pattern = re.compile(r'[\[\]()]')
@@ -313,8 +313,8 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
 class RegistryProcessor1980s(RegistryProcessorOldTX):
     """1980s TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1980s, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1980s, self).__init__()
         
         self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
         self.registry_pattern = re.compile(r'[0-9]+')
@@ -368,8 +368,8 @@ class RegistryProcessor1980s(RegistryProcessorOldTX):
 class RegistryProcessor1990(RegistryProcessorTX):
     """1990 TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1990, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1990, self).__init__()
          
         self.city_pattern = re.compile(r'([^0-9])')
         self.registry_pattern = re.compile(r'[0-9]+')
@@ -438,8 +438,8 @@ class RegistryProcessor1990(RegistryProcessorTX):
 class RegistryProcessor1995(RegistryProcessorTX):
     """1995 TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1995, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1995, self).__init__()
          
         self.city_pattern = re.compile(r'([^0-9])')
         self.registry_pattern = re.compile(r'[0-9]+')
@@ -515,8 +515,8 @@ class RegistryProcessor1995(RegistryProcessorTX):
 class RegistryProcessor1999(RegistryProcessorTX):
     """1999 TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor1999, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor1999, self).__init__()
          
         self.city_pattern = re.compile(r'([^0-9])')
         self.registry_pattern = re.compile(r'[0-9]+')
@@ -592,8 +592,8 @@ class RegistryProcessor1999(RegistryProcessorTX):
 class RegistryProcessor2000s(RegistryProcessorTX):
     """2000s TX registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessor2000s, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessor2000s, self).__init__()
         
         # regex patterns to parse blocks
         self.city_pattern = re.compile(r'([A-Za-z\s]+)')

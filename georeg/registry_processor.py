@@ -90,58 +90,44 @@ class RegistryProcessorException(Exception):
     def __str__(self):
         return self.value
 
-class RegistryProcessor(object):
-    def __init__(self, state, year):
+class RegistryProcessor:
+
+    # constructor no longer takes state & year args, use initialize_state_year() instead
+    def __init__(self):
         self._image = None
         self._image_height = lambda: self._image.shape[0]
         self._image_width = lambda: self._image.shape[1]
         self._thresh = None
 
         # image processing parameters (these are example values)
-        self.kernel_shape = (10,3)
-        self.thresh_value = 60 # higher = more exposure (max = 255) 
+        self.kernel_shape = (10, 3)
+        self.thresh_value = 60  # higher = more exposure (max = 255)
         self.iterations = 8
-        self.match_rate = 0.7 # lower = more lenient
-        self.indent_width = 0.025 # indent width as % of contour width
+        self.match_rate = 0.7  # lower = more lenient
+        self.indent_width = 0.025  # indent width as % of contour width
 
         # percent of image width and height to add to bounding box width and height of contours (improves ocr accuracy)
         # higher = bigger bounding box
         self.bb_expansion_percent = 0.012
 
-        self._expand_bb = lambda x,y,w,h: (x - int(self._image_width() * self.bb_expansion_percent / 2), \
-                                           y - int(self._image_height() * self.bb_expansion_percent / 2), \
-                                           w + int(self._image_width() * self.bb_expansion_percent / 2), \
-                                           h + int(self._image_height() * self.bb_expansion_percent / 2))
+        self._expand_bb = lambda x, y, w, h: (x - int(self._image_width() * self.bb_expansion_percent / 2), \
+                                              y - int(self._image_height() * self.bb_expansion_percent / 2), \
+                                              w + int(self._image_width() * self.bb_expansion_percent / 2), \
+                                              h + int(self._image_height() * self.bb_expansion_percent / 2))
 
         self.columns_per_page = 2
         self.pages_per_image = 1
 
-        self.seed = 0 # seed value for k-means clustering
-        self.std_thresh = 1 # number of standard deviations beyond which contour is no longer considered part of column
+        self.seed = 0  # seed value for k-means clustering
+        self.std_thresh = 1  # number of standard deviations beyond which contour is no longer considered part of column
 
-        self.draw_debug_images = False # turning this on can help with debugging
-        self.assume_pre_processed = False # assume images are preprocessed so to not waste extra computational power
-        self.line_color = (130,130,130) # NOTE: line color for debug images, must be visible in grayscale
-        self.debugdir = "" # dir to which to write debug images
+        self.draw_debug_images = False  # turning this on can help with debugging
+        self.assume_pre_processed = False  # assume images are preprocessed so to not waste extra computational power
+        self.line_color = (130, 130, 130)  # NOTE: line color for debug images, must be visible in grayscale
+        self.debugdir = ""  # dir to which to write debug images
 
         self.businesses = []
         self.__tmp_path = tempfile.mktemp(suffix=".tiff")
-
-        # city lookup
-        self.state = state
-        self._city_lists_path = os.path.join(_datadir, "%s-cities.txt" % (self.state,))
-        self._city_detector = CityDetector()
-        self._city_detector.load_cities(self._city_lists_path)
-
-        # load config file
-        basepath = georeg.__path__[0]
-        filename = str(year) + '.cfg'
-        path = os.path.abspath(os.path.join(basepath, "configs", state, filename))
-        if os.path.exists(path):
-            self.load_settings_from_cfg(path)
-        else:
-            print >>sys.stderr, "configuration file not found"
-     
 
     def __del__(self):
         # clean up our temp files
@@ -149,6 +135,24 @@ class RegistryProcessor(object):
             os.remove(self.__tmp_path)
         if os.path.isfile(self.__tmp_path + ".txt"):
             os.remove(self.__tmp_path + ".txt")
+
+    #initialize this object for the specified state and year (if not done already)
+    def initialize_state_year(self, state, year):
+
+        # initialize city lookup for this state
+        self.state = state
+        self._city_lists_path = os.path.join(_datadir, "%s-cities.txt" % (self.state,))
+        self._city_detector = CityDetector()
+        self._city_detector.load_cities(self._city_lists_path)
+
+        # load config file from this state & year
+        basepath = georeg.__path__[0]
+        filename = str(year) + '.cfg'
+        path = os.path.abspath(os.path.join(basepath, "configs", state, filename))
+        if os.path.exists(path):
+            self.load_settings_from_cfg(path)
+        else:
+            print >> sys.stderr, "configuration file not found"
 
     def process_image(self, path):
         """this is a wrapper for _process_image() which catches exceptions and reports them"""
@@ -220,9 +224,10 @@ class RegistryProcessor(object):
                 for row in file_reader:
                     business = Business()
 
-                    [business.category, business.name, business.city,
-                     business.address, business.zip, business.emp,
-                     business.lat, business.long, business.confidence_score] = row
+                    [business.category, business.name, business.address,
+                     business.city, business.zip, business.emp, business.sales,
+                     business.cat_desc, business.bracket, business.lat,
+                     business.long, business.confidence_score] = row
 
                     # cast to float
                     business.confidence_score = float(business.confidence_score)
@@ -230,7 +235,7 @@ class RegistryProcessor(object):
                     self.businesses.append(business)
 
         # load normal businesses
-        load_businesses(path, False)
+        load_businesses(path)
 
     def record_to_tsv(self, path, mode = 'w'):
         """record business registries to tsv, opened with file access mode: mode"""
@@ -239,7 +244,10 @@ class RegistryProcessor(object):
             file_writer = csv.writer(file, delimiter ="\t")
 
             for business in self.businesses:
-                entry = [business.category, business.name, business.address, business.city, business.zip, business.emp, business.sales, business.cat_desc, business.bracket, business.lat, business.long, business.confidence_score]
+                entry = [business.category, business.name, business.address,
+                         business.city, business.zip, business.emp, business.sales,
+                         business.cat_desc, business.bracket, business.lat, business.long,
+                         business.confidence_score]
 
                 file_writer.writerow(entry)
 

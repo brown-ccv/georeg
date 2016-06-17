@@ -63,7 +63,8 @@ elif args.state == 'TX':
 else:
     raise ValueError("%s is not a supported state" % (args.state,))
 
-reg_processor = RegistryProcessor(args.state, args.year)
+reg_processor = RegistryProcessor()
+reg_processor.initialize_state_year(args.state, args.year)
 
 reg_processor.draw_debug_images = args.debug
 reg_processor.assume_pre_processed = args.pre_processed

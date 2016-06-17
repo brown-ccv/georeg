@@ -15,8 +15,8 @@ import business_geocoder as geo
 class RegistryProcessorNew(reg.RegistryProcessor):
     """1975-present RI registry parser."""
     
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessorNew, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessorNew, self).__init__()
          
         self.current_sic = ""
 
@@ -69,8 +69,8 @@ class RegistryProcessorNew(reg.RegistryProcessor):
 class RegistryProcessorOld(reg.RegistryProcessor):
     """Pre-1975 RI registry parser."""
 
-    def __init__(self, *args, **kwargs):
-        super(RegistryProcessorOld, self).__init__(*args, **kwargs)
+    def __init__(self):
+        super(RegistryProcessorOld, self).__init__()
 
         self.zip_pattern = re.compile(r'(?P<address>^.*)[\s]+(?P<zip>\d{5})[\s-]*')
         self.emp_pattern = re.compile(r'[Ee]mp.*([A-Z])')
