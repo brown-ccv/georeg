@@ -96,7 +96,7 @@ class RegistryProcessor(object):
     def __init__(self):
 
         # these are the only characters we will allow tesseract to recognize (improves accuracy)
-        self._tessarct_char_whitelist = "!\"$#%&'()*+,-./\\0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
+        self._tessarct_char_whitelist = "!\"#%&'()*+,-./\\0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
 
         self._image = None
         self._image_height = lambda: self._image.shape[0]
