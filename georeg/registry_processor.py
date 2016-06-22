@@ -90,10 +90,14 @@ class RegistryProcessorException(Exception):
     def __str__(self):
         return self.value
 
-class RegistryProcessor:
+class RegistryProcessor(object):
 
     # constructor no longer takes state & year args, use initialize_state_year() instead
     def __init__(self):
+
+        # these are the only characters we will allow tesseract to recognize (improves accuracy)
+        self._tessarct_char_whitelist = "!\"$#%&'()*+,-./\\0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
+
         self._image = None
         self._image_height = lambda: self._image.shape[0]
         self._image_width = lambda: self._image.shape[1]
@@ -360,7 +364,9 @@ class RegistryProcessor:
 
         # call tesseract on image
         # (Popen with piped streams hides tesseract output)
-        p = subprocess.Popen(["tesseract", self.__tmp_path, self.__tmp_path, "-psm", "6"], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        p = subprocess.Popen(["tesseract", self.__tmp_path, self.__tmp_path, "-psm", "6", "-c",
+                              "tessedit_char_whitelist=" + self._tessarct_char_whitelist], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
         p.wait()
 
         contour_txt = ""
@@ -368,7 +374,7 @@ class RegistryProcessor:
         for line in open(self.__tmp_path + ".txt"):
             if not re.match(r'^\s*$', line):
                 contour_txt = contour_txt + line
-
+                
         return contour_txt.strip()
 
     def _find_column_locations(self, contours):
