@@ -3,8 +3,8 @@
 import argparse
 import os
 import sys
-
-import georeg
+from multiprocessing.pool import ThreadPool
+from threading import Lock
 
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
@@ -14,6 +14,9 @@ parser.add_argument(
 parser.add_argument(
     "--images", "-i", required=True, nargs='+', help="""
         Images to process.""")
+parser.add_argument(
+    "--threads", type=int, default = 1, help="""
+        Number of threads to use.""")
 parser.add_argument(
     "--append", action="store_true", help="""
         Append to the output file instead of overwriting it.""")
@@ -63,6 +66,10 @@ elif args.state == 'TX':
 else:
     raise ValueError("%s is not a supported state" % (args.state,))
 
+
+#TODO: remove this
+from georeg.registry_processor import DummyTextRecorder as RegistryProcessor
+
 reg_processor = RegistryProcessor()
 reg_processor.initialize_state_year(args.state, args.year)
 
@@ -70,18 +77,47 @@ reg_processor.draw_debug_images = args.debug
 reg_processor.assume_pre_processed = args.pre_processed
 reg_processor.debugdir = args.outdir
 
-if args.append:
-    mode = 'a'
-else:
-    mode = 'w'
-
 outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
 
-for image in args.images:
-    print >>sys.stderr, "processing:", image
-    reg_processor.process_image(image)
-    reg_processor.record_to_tsv(outname, mode)
-    if mode == 'w': mode = 'a'
+# truncate file if we aren't suppose to append
+if not args.append:
+    f = open(outname, 'w')
+    f.close()
+
+images_per_thread = len(args.images) / args.threads
+
+pool = ThreadPool(processes=args.threads)
+
+out_file_mutex = Lock()
+
+def worker_thread_proc(*args):
+
+    # local copy of reg_processor that we can use in this thread
+    _reg_processor = RegistryProcessor(reg_processor)
+    images = args
+
+    for image in images:
+        print >> sys.stderr, "processing:", image
+        _reg_processor.process_image(image)
+
+        # access to file must be syncronized
+        out_file_mutex.acquire()
+        _reg_processor.record_to_tsv(outname, 'a')
+        out_file_mutex.release()
+
+for i in xrange(args.threads):
+    assigned_images = []
+
+    if i == args.threads - 1:
+        assigned_images = args.images[i*images_per_thread:]
+    else:
+        assigned_images = args.images[i * images_per_thread:(i + 1) * images_per_thread]
+
+    # we aren't expecting any return values so no need to store results
+    pool.apply_async(worker_thread_proc, args = assigned_images)
+
+pool.close()
+pool.join()
 
 print('\a')  #makes a noise at the end of the script.  May only work on Mac
 print >>sys.stderr, "done"

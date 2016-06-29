@@ -9,6 +9,7 @@ import sys
 import subprocess
 import ConfigParser
 import itertools
+import time
 from fuzzywuzzy import fuzz, process
 from operator import itemgetter, attrgetter
 from sklearn.cluster import KMeans
@@ -96,7 +97,7 @@ class RegistryProcessor(object):
     def __init__(self):
 
         # these are the only characters we will allow tesseract to recognize (improves accuracy)
-        self._tessarct_char_whitelist = "!\"$#%&'()*+,-./\\0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
+        self._tessarct_char_whitelist = "!\"#%&'()*+,-./\\0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
 
         self._image = None
         self._image_height = lambda: self._image.shape[0]
@@ -122,7 +123,7 @@ class RegistryProcessor(object):
         self.columns_per_page = 2
         self.pages_per_image = 1
 
-        self.seed = 0  # seed value for k-means clustering
+        self.seed = int(time.time())  # seed value for k-means clustering
         self.std_thresh = 1  # number of standard deviations beyond which contour is no longer considered part of column
 
         self.draw_debug_images = False  # turning this on can help with debugging
@@ -212,7 +213,7 @@ class RegistryProcessor(object):
             cv2.imwrite(os.path.join(self.debugdir, "contoured.tiff"), contoured)
 
     def _process_contour(self, contour_txt):
-        """perform pre-processing and ocr on contour"""
+        """process contour text"""
 
         raise NotImplementedError
 
@@ -463,3 +464,25 @@ class RegistryProcessor(object):
             sorted_column_contours.append(sorted(column,key=attrgetter('y')))
 
         return sorted_column_contours, non_column_contours
+
+
+class DummyTextRecorder(RegistryProcessor):
+    def __init__(self, *args, **kwargs):
+        super(DummyTextRecorder, self).__init__(*args, **kwargs)
+
+        self.registry_txt = ""
+        self.year = 0
+
+    def initialize_state_year(self, state, year):
+        self.year = year
+
+        super(DummyTextRecorder, self).initialize_state_year(state, year)
+
+    def _process_contour(self, contour_txt):
+        self.registry_txt += "\n" + contour_txt
+
+    def __del__(self):
+        super(DummyTextRecorder, self).__del__()
+
+        with open("output_" + self.state + "_" + str(self.year) + ".txt", "w") as file:
+            file.write(self.registry_txt)
