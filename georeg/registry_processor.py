@@ -471,18 +471,10 @@ class DummyTextRecorder(RegistryProcessor):
         super(DummyTextRecorder, self).__init__(*args, **kwargs)
 
         self.registry_txt = ""
-        self.year = 0
-
-    def initialize_state_year(self, state, year):
-        self.year = year
-
-        super(DummyTextRecorder, self).initialize_state_year(state, year)
 
     def _process_contour(self, contour_txt):
         self.registry_txt += "\n" + contour_txt
 
-    def __del__(self):
-        super(DummyTextRecorder, self).__del__()
-
-        with open("output_" + self.state + "_" + str(self.year) + ".txt", "w") as file:
+    def record_to_tsv(self, path, mode = 'w'):
+        with open(path, mode) as file:
             file.write(self.registry_txt)
