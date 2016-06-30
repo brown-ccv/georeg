@@ -66,10 +66,6 @@ elif args.state == 'TX':
 else:
     raise ValueError("%s is not a supported state" % (args.state,))
 
-
-#TODO: remove this
-from georeg.registry_processor import DummyTextRecorder as RegistryProcessor
-
 reg_processor = RegistryProcessor()
 reg_processor.initialize_state_year(args.state, args.year)
 
