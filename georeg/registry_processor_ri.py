@@ -85,7 +85,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         self.businesses = [] # reset businesses list
 
-        self._image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        self._image = reg.cv2_imread_safe(path, cv2.IMREAD_GRAYSCALE)
 
         _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
         contours = [reg.Contour(c) for c in contours]
@@ -98,7 +98,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             canvas = np.zeros(self._image.shape,self._image.dtype)
             cv2.drawContours(canvas,[c.data for c in
                 contours],-1,self.line_color,-1)
-            cv2.imwrite("closed.tiff",canvas)
+            reg.cv2_imwrite_safe("closed.tiff",canvas)
 
         business_groups = self._sort_business_group_contours(contours)
 
@@ -162,10 +162,10 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         if self.draw_debug_images:
             # write original image with added contours to disk
-            cv2.imwrite("contoured.tiff", contoured)
+            reg.cv2_imwrite_safe("contoured.tiff", contoured)
 
             # save a second copy that won't be overriden
-            cv2.imwrite(os.path.splitext(path)[0] + "-contoured.tiff", contoured)
+            reg.cv2_imwrite_safe(os.path.splitext(path)[0] + "-contoured.tiff", contoured)
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1953-1975"""
@@ -213,7 +213,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             canvas = self._thresh.copy()
             for c in header_contours:
                 cv2.circle(canvas,(c.x_mid,c.y_mid),20,self.line_color,35)
-            cv2.imwrite("headers.tiff", canvas)
+            reg.cv2_imwrite_safe("headers.tiff", canvas)
 
         return header_contours
 

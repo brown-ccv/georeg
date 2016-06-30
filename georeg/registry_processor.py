@@ -9,10 +9,10 @@ import sys
 import subprocess
 import ConfigParser
 import itertools
-import time
 from fuzzywuzzy import fuzz, process
 from operator import itemgetter, attrgetter
 from sklearn.cluster import KMeans
+from threading import Lock
 
 import georeg
 
@@ -91,7 +91,43 @@ class RegistryProcessorException(Exception):
     def __str__(self):
         return self.value
 
+# thread safe versions of opencv's imread and imwrite
+
+cv2_io_mutex = Lock()
+
+def cv2_imread_safe(*args, **kwargs):
+    cv2_io_mutex.acquire()
+    result = cv2.imread(*args, **kwargs)
+    cv2_io_mutex.release()
+
+    return result
+
+def cv2_imwrite_safe(*args, **kwargs):
+    cv2_io_mutex.acquire()
+    result = cv2.imwrite(*args, **kwargs)
+    cv2_io_mutex.release()
+
+    return result
+
 class RegistryProcessor(object):
+
+    # lambdas were no longer sufficient with multiple threads for some reason
+    def _image_height(self):
+        return self._image.shape[0]
+    def _image_width(self):
+        return self._image.shape[1]
+
+    def _expand_bb(self, x, y, w, h):
+        return \
+        (x - int(self._image_width() * self.bb_expansion_percent / 2), \
+         y - int(self._image_height() * self.bb_expansion_percent / 2), \
+         w + int(self._image_width() * self.bb_expansion_percent / 2), \
+         h + int(self._image_height() * self.bb_expansion_percent / 2))
+
+    # this is needed when a RegistryProcessor class is copied with copy()
+    # because it needs to be unique among separate instances
+    def remake_tmp_file_path(self):
+        self._tmp_path = tempfile.mktemp(suffix=".tiff")
 
     # constructor no longer takes state & year args, use initialize_state_year() instead
     def __init__(self):
@@ -100,8 +136,6 @@ class RegistryProcessor(object):
         self._tessarct_char_whitelist = "!\"#%&'()*+,-./\\0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
 
         self._image = None
-        self._image_height = lambda: self._image.shape[0]
-        self._image_width = lambda: self._image.shape[1]
         self._thresh = None
 
         # image processing parameters (these are example values)
@@ -115,15 +149,9 @@ class RegistryProcessor(object):
         # higher = bigger bounding box
         self.bb_expansion_percent = 0.012
 
-        self._expand_bb = lambda x, y, w, h: (x - int(self._image_width() * self.bb_expansion_percent / 2), \
-                                              y - int(self._image_height() * self.bb_expansion_percent / 2), \
-                                              w + int(self._image_width() * self.bb_expansion_percent / 2), \
-                                              h + int(self._image_height() * self.bb_expansion_percent / 2))
-
         self.columns_per_page = 2
         self.pages_per_image = 1
 
-        self.seed = int(time.time())  # seed value for k-means clustering
         self.std_thresh = 1  # number of standard deviations beyond which contour is no longer considered part of column
 
         self.draw_debug_images = False  # turning this on can help with debugging
@@ -132,14 +160,14 @@ class RegistryProcessor(object):
         self.debugdir = ""  # dir to which to write debug images
 
         self.businesses = []
-        self.__tmp_path = tempfile.mktemp(suffix=".tiff")
+        self._tmp_path = tempfile.mktemp(suffix=".tiff")
 
     def __del__(self):
         # clean up our temp files
-        if os.path.isfile(self.__tmp_path):
-            os.remove(self.__tmp_path)
-        if os.path.isfile(self.__tmp_path + ".txt"):
-            os.remove(self.__tmp_path + ".txt")
+        if os.path.isfile(self._tmp_path):
+            os.remove(self._tmp_path)
+        if os.path.isfile(self._tmp_path + ".txt"):
+            os.remove(self._tmp_path + ".txt")
 
     #initialize this object for the specified state and year (if not done already)
     def initialize_state_year(self, state, year):
@@ -172,12 +200,12 @@ class RegistryProcessor(object):
 
         self.businesses = [] # reset businesses list
 
-        self._image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        self._image = cv2_imread_safe(path, cv2.IMREAD_GRAYSCALE)
 
         _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
         contours = [Contour(c) for c in contours]
 
-        # remove noise from edge of image
+        #remove noise from edge of image
         if not self.assume_pre_processed:
             contours = self._remove_edge_contours(contours)
 
@@ -185,7 +213,7 @@ class RegistryProcessor(object):
             canvas = np.zeros(self._image.shape,self._image.dtype)
             cv2.drawContours(canvas,[c.data for c in
                 contours],-1,self.line_color,-1)
-            cv2.imwrite(os.path.join(self.debugdir, "closed.tiff"),canvas)
+            cv2_imwrite_safe(os.path.join(self.debugdir, "closed.tiff"),canvas)
 
         clustering = self._find_column_locations(contours)
         columns, _ = self._assemble_contour_columns(contours, clustering)
@@ -210,7 +238,7 @@ class RegistryProcessor(object):
 
         if self.draw_debug_images:
             # write original image with added contours to disk
-            cv2.imwrite(os.path.join(self.debugdir, "contoured.tiff"), contoured)
+            cv2_imwrite_safe(os.path.join(self.debugdir, "contoured.tiff"), contoured)
 
     def _process_contour(self, contour_txt):
         """process contour text"""
@@ -361,18 +389,18 @@ class RegistryProcessor(object):
     def _ocr_image(self, image):
         """use tesseract to ocr a black and white image and return the text"""
         # write image to file
-        cv2.imwrite(self.__tmp_path, image)
+        cv2_imwrite_safe(self._tmp_path, image)
 
         # call tesseract on image
         # (Popen with piped streams hides tesseract output)
-        p = subprocess.Popen(["tesseract", self.__tmp_path, self.__tmp_path, "-psm", "6", "-c",
+        p = subprocess.Popen(["tesseract", self._tmp_path, self._tmp_path, "-psm", "6", "-c",
                               "tessedit_char_whitelist=" + self._tessarct_char_whitelist], stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         p.wait()
 
         contour_txt = ""
 
-        for line in open(self.__tmp_path + ".txt"):
+        for line in open(self._tmp_path + ".txt"):
             if not re.match(r'^\s*$', line):
                 contour_txt = contour_txt + line
                 
@@ -388,7 +416,11 @@ class RegistryProcessor(object):
 
         # use k-means clustering to get column boundaries for expected # of cols
         num_cols = self.columns_per_page * self.pages_per_image
-        k_means = KMeans(n_clusters=num_cols, random_state=self.seed)
+        k_means = KMeans(n_clusters=num_cols)
+
+        if len(coords_arr) < num_cols:
+            raise RegistryProcessorException("Number of contours detected fewer than number of expected columns")
+
         clustering = k_means.fit(coords_arr)
 
         # draw columns lines and clusters
@@ -406,7 +438,7 @@ class RegistryProcessor(object):
                     self._image_height()),cluster_colors[ix],20)
 
             # draw column lines to file
-            cv2.imwrite(os.path.join(self.debugdir, "column_lines.tiff"), canvas)
+            cv2_imwrite_safe(os.path.join(self.debugdir, "column_lines.tiff"), canvas)
 
             # draw contour widths in color of assigned cluster
             canvas = self._thresh.copy()
@@ -418,7 +450,7 @@ class RegistryProcessor(object):
                 cv2.line(canvas,(left, y),(right, y),col,10)
 
             # draw clustered column widths to file
-            cv2.imwrite(os.path.join(self.debugdir, "clusters.tiff"), canvas)
+            cv2_imwrite_safe(os.path.join(self.debugdir, "clusters.tiff"), canvas)
 
         return clustering
 
@@ -468,7 +500,7 @@ class RegistryProcessor(object):
 
 class DummyTextRecorder(RegistryProcessor):
     def __init__(self, *args, **kwargs):
-        super(DummyTextRecorder, self).__init__(*args, **kwargs)
+        super(DummyTextRecorder, self).__init__()
 
         self.registry_txt = ""
 

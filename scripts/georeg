@@ -3,8 +3,10 @@
 import argparse
 import os
 import sys
-from multiprocessing.pool import ThreadPool
-from threading import Lock
+import fnmatch
+import copy
+import Queue
+from threading import Thread, Lock
 
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
@@ -12,10 +14,10 @@ parser.add_argument(
     "--year", "-y", type=int, required=True, help="""
         The year of the registry.""")
 parser.add_argument(
-    "--images", "-i", required=True, nargs='+', help="""
-        Images to process.""")
+    "--images", "-i", required=True, help="""
+        Path of images to process (not a list, use unix file matching).""")
 parser.add_argument(
-    "--threads", type=int, default = 1, help="""
+    "--threads", type=int, nargs='?', default = 1, help="""
         Number of threads to use.""")
 parser.add_argument(
     "--append", action="store_true", help="""
@@ -61,59 +63,101 @@ elif args.state == 'TX':
     elif args.year == 1950 or args.year == 1954:
         from georeg.registry_processor_tx import RegistryProcessor1950s as RegistryProcessor
     else:
-        raise ValueError("%d is not a supported year for TX" % (args.year,))
+        raise ValueError("%d is not a supported year for TX" % (args.year))
 
 else:
-    raise ValueError("%s is not a supported state" % (args.state,))
+    raise ValueError("%s is not a supported state" % (args.state))
 
-reg_processor = RegistryProcessor()
-reg_processor.initialize_state_year(args.state, args.year)
+class WorkerThread(Thread):
+    reg_processor = RegistryProcessor() # regprocessor object that is copied by each thread
+    out_file_mutex = Lock() # mutex to syncronize access to output file
 
-reg_processor.draw_debug_images = args.debug
-reg_processor.assume_pre_processed = args.pre_processed
-reg_processor.debugdir = args.outdir
+    next_id = 0
+    bucket = Queue.Queue()
+
+    def __init__(self, images):
+        super(WorkerThread, self).__init__(name = "reg_processor_thread_%d" % WorkerThread.next_id)
+        WorkerThread.next_id += 1
+
+        self.images = images
+
+    def run(self):
+        try:
+            # local copy of reg_processor that we can use in this thread
+            _reg_processor = copy.copy(WorkerThread.reg_processor)
+            _reg_processor.remake_tmp_file_path()
+
+            for image in self.images:
+                print "processing:", image
+
+                _reg_processor.process_image(image)
+
+                # access to file must be syncronized
+                WorkerThread.out_file_mutex.acquire()
+                _reg_processor.record_to_tsv(outname, 'a')
+                WorkerThread.out_file_mutex.release()
+        except Exception as e:
+            WorkerThread.bucket.put(sys.exc_info())
+
+
+# initialize reg_processor object inside WorkerThread class
+WorkerThread.reg_processor = RegistryProcessor()
+WorkerThread.reg_processor.initialize_state_year(args.state, args.year)
+
+WorkerThread.reg_processor.draw_debug_images = args.debug
+WorkerThread.reg_processor.assume_pre_processed = args.pre_processed
+WorkerThread.reg_processor.debugdir = args.outdir
 
 outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
 
 # truncate file if we aren't suppose to append
+# noinspection PyUnboundLocalVariable
 if not args.append:
     f = open(outname, 'w')
     f.close()
 
-images_per_thread = len(args.images) / args.threads
+# construct actual image list from unix file match pattern
+dir, pattern = os.path.split(args.images)
+image_list = []
 
-pool = ThreadPool(processes=args.threads)
+for item in os.listdir(dir):
+    if fnmatch.fnmatch(item, pattern):
+        image_list.append(os.path.join(dir,item))
 
-out_file_mutex = Lock()
 
-def worker_thread_proc(*args):
+# intialize some threading variables
+images_per_thread = len(image_list) / args.threads
+threads = []
 
-    # local copy of reg_processor that we can use in this thread
-    _reg_processor = RegistryProcessor(reg_processor)
-    images = args
-
-    for image in images:
-        print >> sys.stderr, "processing:", image
-        _reg_processor.process_image(image)
-
-        # access to file must be syncronized
-        out_file_mutex.acquire()
-        _reg_processor.record_to_tsv(outname, 'a')
-        out_file_mutex.release()
-
+# start threads
 for i in xrange(args.threads):
     assigned_images = []
 
     if i == args.threads - 1:
-        assigned_images = args.images[i*images_per_thread:]
+        assigned_images = image_list[i * images_per_thread:]
     else:
-        assigned_images = args.images[i * images_per_thread:(i + 1) * images_per_thread]
+        assigned_images = image_list[i * images_per_thread:(i + 1) * images_per_thread]
 
-    # we aren't expecting any return values so no need to store results
-    pool.apply_async(worker_thread_proc, args = assigned_images)
+    threads.append(WorkerThread(assigned_images))
+    threads[-1].start()
+threads_still_alive = True
 
-pool.close()
-pool.join()
+# loop until threads exit
+while threads_still_alive:
+    threads_still_alive = False
+
+    for thread in threads:
+        thread.join(8.0 / args.threads)
+
+        if thread.isAlive():
+            threads_still_alive = True
+        else:
+            if not WorkerThread.bucket.empty():
+                exc_type, exc_obj, exc_trace = WorkerThread.bucket.get(block = False)
+
+                # deal with exception
+                print >>sys.stderr, exc_type, exc_obj
+                print >>sys.stderr, exc_trace
 
 print('\a')  #makes a noise at the end of the script.  May only work on Mac
 print >>sys.stderr, "done"
