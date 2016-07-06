@@ -9,9 +9,6 @@ import registry_processor as reg
 import business_geocoder as geo
 from operator import itemgetter, attrgetter
 
-import registry_processor as reg
-import business_geocoder as geo
-
 class RegistryProcessorNew(reg.RegistryProcessor):
     """1975-present RI registry parser."""
     
@@ -65,6 +62,43 @@ class RegistryProcessorNew(reg.RegistryProcessor):
 
         return business
 
+class RegistryRecorder(RegistryProcessorNew):
+    def __init__(self):
+        super(RegistryRecorder, self).__init__()
+
+        self.bus_start_token = "<BUS_START>"
+        self.bus_end_token = "<BUS_END>"
+
+        self.name_start_token = "<NAME_START>"
+        self.bus_type_start_token = "<BUS_TYPE_START>"
+        self.address_start_token = "<ADDRESS_START>"
+
+        self.end_token = "<FIELD_END>"
+
+        self.registry_txt = ""
+
+    def _process_contour(self, contour_txt):
+        """works for registries from 1975-onward"""
+
+        registry_match = self.registry_pattern.match(contour_txt)
+        sic_match = self.sic_pattern.match(contour_txt)
+
+        if registry_match and not sic_match:
+            lines = contour_txt.split("\n")
+
+            if len(lines) < 2:
+                return
+
+            lines[0] = self.name_start_token + " " + lines[0] + " " + self.end_token
+            lines[1] = self.address_start_token + " " + lines[1] + " " + self.end_token
+
+            self.registry_txt += "\n" + self.bus_start_token + "\n"
+            self.registry_txt += " ".join(lines)
+            self.registry_txt += "\n" + self.bus_end_token + "\n"
+
+    def record_to_tsv(self, path, mode='w'):
+        with open(path, mode) as file:
+            file.write(self.registry_txt)
 
 class RegistryProcessorOld(reg.RegistryProcessor):
     """Pre-1975 RI registry parser."""
@@ -135,30 +169,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                 cropped = self._thresh[y:y+h, x:x+w]
                 contour_txt = self._ocr_image(cropped)
 
-                if contour_txt.count("\n") > 0: # if the contour's text has 2 or more lines consider it a registry
-                    business = self._parse_registry_block(contour_txt)
-                    business.category = header_str
-                    if len(self.current_city) > 0:
-                        business.city = self.current_city
-                    if len(self.current_zip) > 0:
-                        business.zip = self.current_zip
-                    
-                    geo.geocode_business(business)
-                    self.businesses.append(business)
-                else: # check if city header
-                    segments = contour_txt.rpartition(" ")
-                    zip = ""
-
-                    # check if zip is in header
-                    if segments[2].isdigit() and len(segments[2]) == 5:
-                        zip = segments[2]
-                        contour_txt = segments[0]
-
-                    match_city = self._city_detector.match_to_cities(contour_txt)
-
-                    if match_city:
-                        self.current_city = match_city
-                        self.current_zip = zip
+                self._process_contour(contour_txt, header_str)
 
         if self.draw_debug_images:
             # write original image with added contours to disk
@@ -167,10 +178,33 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             # save a second copy that won't be overriden
             reg.cv2_imwrite_safe(os.path.splitext(path)[0] + "-contoured.tiff", contoured)
 
+    def _process_contour(self, contour_txt, header_str):
+        if contour_txt.count("\n") > 0:  # if the contour's text has 2 or more lines consider it a registry
+            business = self._parse_registry_block(contour_txt)
+            business.category = header_str
+            if len(self.current_city) > 0:
+                business.city = self.current_city
+            if len(self.current_zip) > 0:
+                business.zip = self.current_zip
+
+            geo.geocode_business(business)
+            self.businesses.append(business)
+        else:  # check if city header
+            segments = contour_txt.rpartition(" ")
+            zip = ""
+
+            # check if zip is in header
+            if segments[2].isdigit() and len(segments[2]) == 5:
+                zip = segments[2]
+                contour_txt = segments[0]
+
+            match_city = self._city_detector.match_to_cities(contour_txt)
+
+            if match_city:
+                self.current_city = match_city
+                self.current_zip = zip
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1953-1975"""
-        # NOTE: this function was made before
-        # I knew how to take advantage of regular expressions
 
         business = reg.Business()
 
@@ -193,7 +227,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         return business
 
-    def _find_headers(self, header_contours, column_locations, page_boundary):
+    def _find_headers(self, header_contours, page_boundary):
         """find business description headers in non-column contours
         (returns headers sorted by position)"""
 
@@ -235,7 +269,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         # seperate headers from columns
         column_contours, non_column_contours = self._assemble_contour_columns(contours, clustering)
-        header_contours = self._find_headers(non_column_contours, column_locations, page_boundary)
+        header_contours = self._find_headers(non_column_contours, page_boundary)
 
         business_groups = []
 
@@ -246,9 +280,6 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             # if there is a next header give next_header a value
             if i + 1 < len(header_contours):
                 next_header = header_contours[i+1]
-
-            column_start = None
-            column_end = None
 
             if on_first_page(header):
                 column_start = 0

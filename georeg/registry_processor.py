@@ -133,7 +133,7 @@ class RegistryProcessor(object):
     def __init__(self):
 
         # these are the only characters we will allow tesseract to recognize (improves accuracy)
-        self._tessarct_char_whitelist = "!\"#%&'()*+,-./\\0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
+        self._tessarct_char_whitelist = "\"#%&'()*+,-./\\0123456789:;ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
 
         self._image = None
         self._thresh = None
@@ -499,7 +499,7 @@ class RegistryProcessor(object):
 
 
 class DummyTextRecorder(RegistryProcessor):
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         super(DummyTextRecorder, self).__init__()
 
         self.registry_txt = ""

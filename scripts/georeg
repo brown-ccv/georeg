@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+import traceback
 import fnmatch
 import copy
 import Queue
@@ -96,7 +97,7 @@ class WorkerThread(Thread):
                 WorkerThread.out_file_mutex.acquire()
                 _reg_processor.record_to_tsv(outname, 'a')
                 WorkerThread.out_file_mutex.release()
-        except Exception as e:
+        except Exception:
             WorkerThread.bucket.put(sys.exc_info())
 
 
@@ -153,11 +154,11 @@ while threads_still_alive:
             threads_still_alive = True
         else:
             if not WorkerThread.bucket.empty():
-                exc_type, exc_obj, exc_trace = WorkerThread.bucket.get(block = False)
+                exc_type, exc_value, exc_trace = WorkerThread.bucket.get(block = False)
 
                 # deal with exception
-                print >>sys.stderr, exc_type, exc_obj
-                print >>sys.stderr, exc_trace
+                print >>sys.stderr, exc_type, exc_value
+                traceback.print_tb(exc_trace, file=sys.stderr)
 
-print('\a')  #makes a noise at the end of the script.  May only work on Mac
+print('\a') #makes a noise at the end of the script.
 print >>sys.stderr, "done"
