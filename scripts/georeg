@@ -6,8 +6,10 @@ import sys
 import traceback
 import fnmatch
 import copy
-import Queue
-from threading import Thread, Lock
+import time
+import multiprocessing
+from multiprocessing import Lock, Queue
+from multiprocessing.pool import ThreadPool
 
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
@@ -17,9 +19,6 @@ parser.add_argument(
 parser.add_argument(
     "--images", "-i", required=True, help="""
         Path of images to process (not a list, use unix file matching).""")
-parser.add_argument(
-    "--threads", type=int, nargs='?', default = 1, help="""
-        Number of threads to use.""")
 parser.add_argument(
     "--append", action="store_true", help="""
         Append to the output file instead of overwriting it.""")
@@ -69,50 +68,38 @@ elif args.state == 'TX':
 else:
     raise ValueError("%s is not a supported state" % (args.state))
 
-class WorkerThread(Thread):
-    reg_processor = RegistryProcessor() # regprocessor object that is copied by each thread
-    out_file_mutex = Lock() # mutex to syncronize access to output file
+reg_processor = RegistryProcessor()
+reg_processor.initialize_state_year(args.state, args.year)
 
-    next_id = 0
-    bucket = Queue.Queue()
-
-    def __init__(self, images):
-        super(WorkerThread, self).__init__(name = "reg_processor_thread_%d" % WorkerThread.next_id)
-        WorkerThread.next_id += 1
-
-        self.images = images
-
-    def run(self):
-        try:
-            # local copy of reg_processor that we can use in this thread
-            _reg_processor = copy.copy(WorkerThread.reg_processor)
-            _reg_processor.remake_tmp_file_path()
-
-            for image in self.images:
-                print "processing:", image
-
-                _reg_processor.process_image(image)
-
-                # access to file must be syncronized
-                WorkerThread.out_file_mutex.acquire()
-                _reg_processor.record_to_tsv(outname, 'a')
-                WorkerThread.out_file_mutex.release()
-        except Exception:
-            WorkerThread.bucket.put(sys.exc_info())
-
-
-# initialize reg_processor object inside WorkerThread class
-WorkerThread.reg_processor = RegistryProcessor()
-WorkerThread.reg_processor.initialize_state_year(args.state, args.year)
-
-WorkerThread.reg_processor.draw_debug_images = args.debug
-WorkerThread.reg_processor.assume_pre_processed = args.pre_processed
-WorkerThread.reg_processor.debugdir = args.outdir
+reg_processor.draw_debug_images = args.debug
+reg_processor.assume_pre_processed = args.pre_processed
+reg_processor.debugdir = args.outdir
 
 outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
 
+def worker_thread_f(images):
+    try:
+        # local copy of reg_processor that we can use in this thread
+        _reg_processor = copy.copy(reg_processor)
+        _reg_processor.remake_tmp_file_path()
+
+        for image in images:
+            print "processing:", image
+
+            _reg_processor.process_image(image)
+
+            # access to file must be syncronized
+            worker_thread_f.file_mutex.acquire()
+            _reg_processor.record_to_tsv(outname, 'a')
+            worker_thread_f.file_mutex.release()
+    except Exception:
+        worker_thread_f.bucket.put(sys.exc_info())
+
+# static variables for worker thread function
+worker_thread_f.bucket = Queue() # holds exception information of crashed threads
+worker_thread_f.file_mutex = Lock()
+
 # truncate file if we aren't suppose to append
-# noinspection PyUnboundLocalVariable
 if not args.append:
     f = open(outname, 'w')
     f.close()
@@ -125,40 +112,45 @@ for item in os.listdir(dir):
     if fnmatch.fnmatch(item, pattern):
         image_list.append(os.path.join(dir,item))
 
+# find number of cores
+try:
+    num_threads = multiprocessing.cpu_count()
+except NotImplementedError:
+    print >>sys.stderr, "unable to detect number of cores... defaulting to 4 threads"
+    num_threads = 4
 
 # intialize some threading variables
-images_per_thread = len(image_list) / args.threads
-threads = []
+images_per_thread = len(image_list) / num_threads
+pool = ThreadPool(processes = num_threads)
+results = []
+
+start_time = time.time()
 
 # start threads
-for i in xrange(args.threads):
+for i in xrange(num_threads):
     assigned_images = []
 
-    if i == args.threads - 1:
+    if i == num_threads - 1:
         assigned_images = image_list[i * images_per_thread:]
     else:
         assigned_images = image_list[i * images_per_thread:(i + 1) * images_per_thread]
 
-    threads.append(WorkerThread(assigned_images))
-    threads[-1].start()
-threads_still_alive = True
+    results.append(pool.apply_async(worker_thread_f, (assigned_images,)))
 
-# loop until threads exit
-while threads_still_alive:
-    threads_still_alive = False
+pool.close()
+pool.join()
 
-    for thread in threads:
-        thread.join(8.0 / args.threads)
+# print exception information of failed threads
+while not worker_thread_f.bucket.empty():
+    exc_type, exc_value, exc_trace = worker_thread_f.bucket.get(block=False)
 
-        if thread.isAlive():
-            threads_still_alive = True
-        else:
-            if not WorkerThread.bucket.empty():
-                exc_type, exc_value, exc_trace = WorkerThread.bucket.get(block = False)
+    print >> sys.stderr, exc_type, exc_value
+    traceback.print_tb(exc_trace, file=sys.stderr)
 
-                # deal with exception
-                print >>sys.stderr, exc_type, exc_value
-                traceback.print_tb(exc_trace, file=sys.stderr)
+num_failed_threads = reduce(lambda n, r: n if r.sucessful() else n + 1, results, 0)
+end_time = time.time()
 
-print('\a') #makes a noise at the end of the script.
+print >>sys.stderr, "Number of worker threads failed: %d" % num_failed_threads
+print >>sys.stderr, "Elapsed time: %d hours, %d minutes and %d seconds" % (end_time / 60**2, (end_time % 60**2) / 60, (end_time % 60**2) % 60)
+
 print >>sys.stderr, "done"
