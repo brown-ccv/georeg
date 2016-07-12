@@ -93,7 +93,12 @@ def worker_thread_f(images):
             _reg_processor.record_to_tsv(outname, 'a')
             worker_thread_f.file_mutex.release()
     except Exception:
-        worker_thread_f.bucket.put(sys.exc_info())
+        exc_type, exc_value, exc_trace = sys.exc_info()
+
+        # convert into a string for reporting (traceback objects can't be sent across threads)
+        exc_trace = ''.join(traceback.format_tb(exc_trace))
+
+        worker_thread_f.bucket.put((exc_type, exc_value, exc_trace))
 
 # static variables for worker thread function
 worker_thread_f.bucket = Queue() # holds exception information of crashed threads
@@ -140,17 +145,20 @@ for i in xrange(num_threads):
 pool.close()
 pool.join()
 
+num_failed_threads = 0
+
 # print exception information of failed threads
 while not worker_thread_f.bucket.empty():
     exc_type, exc_value, exc_trace = worker_thread_f.bucket.get(block=False)
 
-    print >> sys.stderr, exc_type, exc_value
-    traceback.print_tb(exc_trace, file=sys.stderr)
+    print >> sys.stderr, "Exception in worker thread:", exc_type, exc_value
+    print >> sys.stderr, "Trace back:\n", exc_trace
 
-num_failed_threads = reduce(lambda n, r: n if r.sucessful() else n + 1, results, 0)
-end_time = time.time()
+    num_failed_threads += 1
 
-print >>sys.stderr, "Number of worker threads failed: %d" % num_failed_threads
-print >>sys.stderr, "Elapsed time: %d hours, %d minutes and %d seconds" % (end_time / 60**2, (end_time % 60**2) / 60, (end_time % 60**2) % 60)
+elapsed_time = time.time() - start_time
 
-print >>sys.stderr, "done"
+print "Number of worker threads failed: %d" % num_failed_threads
+print "Elapsed time: %d hours, %d minutes and %d seconds" % (elapsed_time / 60**2, (elapsed_time % 60**2) / 60, (elapsed_time % 60**2) % 60)
+
+print "done"
