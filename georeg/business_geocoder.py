@@ -1,5 +1,6 @@
 import os
 
+import geopy
 from brown_geopy.brownarcgis import BrownArcGIS
 
 
@@ -12,8 +13,11 @@ def geocode_business(business, state = 'RI', timeout=60):
     """geocode a business object and store the results inside it,
     return confidence score"""
 
-    location = geolocator.geocode(street=business.address, city=business.city,
-            state=state, zip_cd=business.zip, n_matches = 1, timeout = timeout)
+    try:
+        location = geolocator.geocode(street=business.address, city=business.city,
+                state=state, zip_cd=business.zip, n_matches = 1, timeout = timeout)
+    except geopy.exc.ConfigurationError:
+        location = None
 
     if location:
         match = location["candidates"][0]["attributes"]

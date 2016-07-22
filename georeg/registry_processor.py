@@ -15,6 +15,7 @@ from sklearn.cluster import KMeans
 from threading import Lock
 
 import georeg
+from TessBinding import TessBaseAPI
 
 _datadir = os.path.join(georeg.__path__[0], "data")
 
@@ -34,11 +35,8 @@ class CityDetector:
     def match_to_cities(self, line, cutoff=60):
         line = line.lower().strip()
 
-        # '—' not easily expressed in ascii
-        em_dash = '\xe2\x80\x94'
-
         # if the end of the string matches "—continued" then remove it
-        if fuzz.ratio(line[-12:], em_dash + "continued") > cutoff:
+        if fuzz.ratio(line[-12:], "-continued") > cutoff:
             line = line[:-12]
 
         match, ratio = process.extractOne(line, self.city_list)
@@ -68,11 +66,12 @@ class Business:
 
 
 class Contour:
-    def __init__(self, contour = None):
+    def __init__(self, contour=None):
         self.data = contour
-        
+        self.text = ""
+
         if contour is not None:
-            [self.x,self.y,self.w,self.h] = cv2.boundingRect(contour)
+            [self.x, self.y, self.w, self.h] = cv2.boundingRect(contour)
             self.x_mid = self.x + self.w / 2
             self.y_mid = self.y + self.h / 2
         else:
@@ -80,7 +79,7 @@ class Contour:
             self.y = 0
             self.w = 0
             self.h = 0
-    
+
             self.x_mid = 0
             self.y_mid = 0
 
@@ -125,15 +124,22 @@ class RegistryProcessor(object):
          h + int(self._image_height() * self.bb_expansion_percent / 2))
 
     # this is needed when a RegistryProcessor class is copied with copy()
-    # because it needs to be unique among separate instances
-    def remake_tmp_file_path(self):
-        self._tmp_path = tempfile.mktemp(suffix=".tiff")
+    # because the api object is likely not thread safe (it could be unnecessary though)
+    def make_tess_api(self):
+        self._tess_api = TessBaseAPI()
+
+        # set some tesseract parameters
+        if not self._tess_api.SetVariable("tessedit_pageseg_mode", "6"):
+            print >> sys.stderr, "error setting psm"
+        if not self._tess_api.SetVariable("tessedit_char_whitelist", "\"#%&'()*+,-./\\0123456789:;ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"):
+            print >> sys.stderr, "error setting char whitelist"
 
     # constructor no longer takes state & year args, use initialize_state_year() instead
     def __init__(self):
+        self._tess_api = None
 
-        # these are the only characters we will allow tesseract to recognize (improves accuracy)
-        self._tessarct_char_whitelist = "\"#%&'()*+,-./\\0123456789:;ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"
+        # initialize self._tess_api
+        self.make_tess_api()
 
         self._image = None
         self._thresh = None
@@ -151,8 +157,13 @@ class RegistryProcessor(object):
 
         self.columns_per_page = 2
         self.pages_per_image = 1
+        self.page_boundary = -1 # coordinates of page boundary on current image (only used if self.pages_per_image == 2)
 
         self.std_thresh = 1  # number of standard deviations beyond which contour is no longer considered part of column
+
+        # keep stats on OCR confidence
+        self.confidence_sum = 0
+        self.num_words = 0
 
         self.draw_debug_images = False  # turning this on can help with debugging
         self.assume_pre_processed = False  # assume images are preprocessed so to not waste extra computational power
@@ -160,14 +171,6 @@ class RegistryProcessor(object):
         self.debugdir = ""  # dir to which to write debug images
 
         self.businesses = []
-        self._tmp_path = tempfile.mktemp(suffix=".tiff")
-
-    def __del__(self):
-        # clean up our temp files
-        if os.path.isfile(self._tmp_path):
-            os.remove(self._tmp_path)
-        if os.path.isfile(self._tmp_path + ".txt"):
-            os.remove(self._tmp_path + ".txt")
 
     #initialize this object for the specified state and year (if not done already)
     def initialize_state_year(self, state, year):
@@ -190,11 +193,12 @@ class RegistryProcessor(object):
     def process_image(self, path):
         """this is a wrapper for _process_image() which catches exceptions and reports them"""
         try:
-            self._process_image(path)
+            self.__process_image(path)
         except RegistryProcessorException as e:
             print >>sys.stderr, "error: %s, skipping" % e
 
-    def _process_image(self, path):
+    # this function should not need to be overriden
+    def __process_image(self, path):
         """process a registry image and store results in the businesses member,
         don't call this directly call process_image() instead"""
 
@@ -216,34 +220,76 @@ class RegistryProcessor(object):
             cv2_imwrite_safe(os.path.join(self.debugdir, "closed.tiff"),canvas)
 
         clustering = self._find_column_locations(contours)
-        columns, _ = self._assemble_contour_columns(contours, clustering)
-        contours = list(itertools.chain.from_iterable(columns))
+        column_contours, noncolumn_contours = self._make_contour_columns(contours, clustering)
+
+        noncolumn_contours = self._get_noncolumn_contours_of_interest(noncolumn_contours)
 
         contoured = None
 
         if self.draw_debug_images:
             contoured = self._image.copy()
 
-        for contour in contours:
+        # set the image tesseract will work with
+        self._tess_api.SetImage(self._thresh)
+
+        for contour in itertools.chain.from_iterable(column_contours):
             x,y,w,h = self._expand_bb(contour.x,contour.y,contour.w,contour.h)
 
             if self.draw_debug_images:
                 # draw bounding box on original image
                 cv2.rectangle(contoured,(x,y),(x+w,y+h),self.line_color,5)
 
-            cropped = self._thresh[y:y+h, x:x+w]
-            contour_txt = self._ocr_image(cropped)
+            # specify region tesseract should ocr
+            self._tess_api.SetRectangle(x,y,w,h)
+            contour.text = self._tess_api.GetUTF8Text()
 
-            self._process_contour(contour_txt)
+            #print contour.text
+            total_conf, num_words = self._tess_api.TotalConfidence()
+
+            #print total_conf * 1.0 / num_words
+
+            self.confidence_sum += total_conf
+            self.num_words += num_words
+
+        for contour in noncolumn_contours:
+            x, y, w, h = self._expand_bb(contour.x, contour.y, contour.w, contour.h)
+
+            if self.draw_debug_images:
+                # draw bounding box on original image
+                cv2.rectangle(contoured, (x, y), (x + w, y + h), self.line_color, 5)
+
+            # specify region tesseract should ocr
+            self._tess_api.SetRectangle(x, y, w, h)
+            contour.text = self._tess_api.GetUTF8Text()
 
         if self.draw_debug_images:
             # write original image with added contours to disk
             cv2_imwrite_safe(os.path.join(self.debugdir, "contoured.tiff"), contoured)
 
+        self._process_all_contours(column_contours, noncolumn_contours)
+
+    def _get_noncolumn_contours_of_interest(self, noncolumn_contours):
+        """override this if your class is interested in non-column contours"""
+        return []
+
+    def _process_all_contours(self, column_contours, noncolumn_contours):
+        """Accepts relevant contours found in an image and processes them.
+            Override this if there are noncolumn contours you need to process"""
+
+        for contour in itertools.chain.from_iterable(column_contours):
+            self._process_contour(contour.text)
+
     def _process_contour(self, contour_txt):
-        """process contour text"""
+        """process the text of a contour"""
 
         raise NotImplementedError
+
+    def mean_ocr_confidence(self):
+        return self.confidence_sum * 1.0 / self.num_words if self.num_words > 0 else -1
+
+    def reset_ocr_confidence(self):
+        self.confidence_sum = 0
+        self.num_words = 0
 
     def load_from_tsv(self, path):
         """load self.businesses from a tsv file where they were previously saved"""
@@ -346,7 +392,7 @@ class RegistryProcessor(object):
         if len(filtered_contours) == 0:
             raise RegistryProcessorException("No non-background contours found, check debug images")
 
-        # create cropped version of
+        # create cropped version of image
         super_contour = np.concatenate([c.data for c in filtered_contours])
         [x,y,w,h] = cv2.boundingRect(super_contour)
 
@@ -372,7 +418,7 @@ class RegistryProcessor(object):
     def _get_contours(self, kernel_shape, iter, make_new_thresh = True):
         """performs a close operation on self._image then extracts the contours"""
 
-        if make_new_thresh: # if thresh_value is provided then we make a new thresh image
+        if make_new_thresh: # if asked then we make a new thresh image
             if not self.assume_pre_processed:
                 _,self._thresh = cv2.threshold(self._image,self.thresh_value,255,cv2.THRESH_BINARY_INV) # threshold
             else:
@@ -385,26 +431,6 @@ class RegistryProcessor(object):
         closed = cv2.morphologyEx(closed,cv2.MORPH_OPEN,kernel,iterations = iter / 3)
 
         return cv2.findContours(closed,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE) # get contours
-
-    def _ocr_image(self, image):
-        """use tesseract to ocr a black and white image and return the text"""
-        # write image to file
-        cv2_imwrite_safe(self._tmp_path, image)
-
-        # call tesseract on image
-        # (Popen with piped streams hides tesseract output)
-        p = subprocess.Popen(["tesseract", self._tmp_path, self._tmp_path, "-psm", "6", "-c",
-                              "tessedit_char_whitelist=" + self._tessarct_char_whitelist], stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        p.wait()
-
-        contour_txt = ""
-
-        for line in open(self._tmp_path + ".txt"):
-            if not re.match(r'^\s*$', line):
-                contour_txt = contour_txt + line
-                
-        return contour_txt.strip()
 
     def _find_column_locations(self, contours):
         """find column column locations, and page boundary if two pages
@@ -422,6 +448,12 @@ class RegistryProcessor(object):
             raise RegistryProcessorException("Number of contours detected fewer than number of expected columns")
 
         clustering = k_means.fit(coords_arr)
+
+        self.page_boundary = -1
+        if self.pages_per_image == 2:  # if there are two pages find the page boundary
+            sorted_cols = sorted(clustering)
+            self.page_boundary = (sorted_cols[self.columns_per_page - 1][0] +
+                                  sorted_cols[self.columns_per_page][0]) / (2 * 1.0)
 
         # draw columns lines and clusters
         if self.draw_debug_images:
@@ -454,9 +486,10 @@ class RegistryProcessor(object):
 
         return clustering
 
-    def _assemble_contour_columns(self, contours, clustering):
-        """assemble contours into columns and seperate those that dont belong
-        to a column (returns contours sorted by column and position)"""
+    def _make_contour_columns(self, contours, clustering):
+        """makes contour columns based on column locations
+           return: contour_columns, noncolumn_contours
+           (column contours are sorted by column and position)"""
 
         column_contours = []
         non_column_contours = []

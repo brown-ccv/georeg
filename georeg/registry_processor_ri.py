@@ -114,70 +114,6 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         self.line_color = (130,130,130)
 
-    def _process_image(self, path):
-        """process a registry image from 1953-1975"""
-
-        self.businesses = [] # reset businesses list
-
-        self._image = reg.cv2_imread_safe(path, cv2.IMREAD_GRAYSCALE)
-
-        _,contours,_ = self._get_contours(self.kernel_shape, self.iterations, True)
-        contours = [reg.Contour(c) for c in contours]
-
-        # remove noise from edge of image
-        if not self.assume_pre_processed:
-            contours = self._remove_edge_contours(contours)
-
-        if self.draw_debug_images:
-            canvas = np.zeros(self._image.shape,self._image.dtype)
-            cv2.drawContours(canvas,[c.data for c in
-                contours],-1,self.line_color,-1)
-            reg.cv2_imwrite_safe("closed.tiff",canvas)
-
-        business_groups = self._sort_business_group_contours(contours)
-
-        if len(business_groups) == 0:
-            raise reg.RegistryProcessorException("error finding business groups in the document")
-
-        contoured = None
-
-        if self.draw_debug_images:
-            contoured = self._image.copy()
-
-        for header, business_group in business_groups:
-            # make bounding box bigger
-            x,y,w,h = self._expand_bb(header.x,header.y,header.w,header.h)
-
-            if self.draw_debug_images:
-                # draw bounding box on original image
-                cv2.rectangle(contoured,(x,y),(x+w,y+h),self.line_color,5)
-
-            header_crop = self._thresh[y:y+h, x:x+w]
-            header_str = self._ocr_image(header_crop)
-            # remove surrounding quotes and newline chars
-            header_str = re.sub(r'^"|\n|"$', ' ', header_str).strip()
-
-            for business in business_group:
-                # make bounding box bigger
-                x,y,w,h = self._expand_bb(business.x,business.y,business.w,business.h)
-
-                if self.draw_debug_images:
-                    # draw bounding box on original image
-                    cv2.rectangle(contoured,(x,y),(x+w,y+h),self.line_color,5)
-
-                # ocr the contour
-                cropped = self._thresh[y:y+h, x:x+w]
-                contour_txt = self._ocr_image(cropped)
-
-                self._process_contour(contour_txt, header_str)
-
-        if self.draw_debug_images:
-            # write original image with added contours to disk
-            reg.cv2_imwrite_safe("contoured.tiff", contoured)
-
-            # save a second copy that won't be overriden
-            reg.cv2_imwrite_safe(os.path.splitext(path)[0] + "-contoured.tiff", contoured)
-
     def _process_contour(self, contour_txt, header_str):
         if contour_txt.count("\n") > 0:  # if the contour's text has 2 or more lines consider it a registry
             business = self._parse_registry_block(contour_txt)
@@ -203,6 +139,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             if match_city:
                 self.current_city = match_city
                 self.current_zip = zip
+
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1953-1975"""
 
@@ -227,49 +164,52 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         return business
 
-    def _find_headers(self, header_contours, page_boundary):
-        """find business description headers in non-column contours
-        (returns headers sorted by position)"""
+    def _get_noncolumn_contours_of_interest(self, noncolumn_contours):
+        """Here we tell the base class which non-column contours are important,
+           in our case it is the business description headers (headers get sorted by position)"""
 
         # remove noise from headers
-        highest_width = reduce(lambda h_w, hdr: max([h_w, hdr.w]), header_contours, 0)
-        header_contours = [h for h in header_contours if h.w / (highest_width * 1.0) >= 0.2] # all headers that are not atleast 1/5 the width of the widest header are removed
+        highest_width = reduce(lambda h_w, hdr: max([h_w, hdr.w]), noncolumn_contours, 0)
+
+        # all headers that are not atleast 1/5 the width of the widest header are removed
+        header_contours = [h for h in noncolumn_contours if h.w / (highest_width * 1.0) >= 0.2]
 
         if len(header_contours) == 0:
             raise reg.RegistryProcessorException("unable to detect business category headers")
 
         # sort headers by position
-        header_contours = sorted([h for h in header_contours if h.x < page_boundary or page_boundary == -1],key=attrgetter('y')) + \
-                          sorted([h for h in header_contours if h.x >= page_boundary and page_boundary != -1],key=attrgetter('y'))
-
+        header_contours = sorted([h for h in header_contours if h.x < self.page_boundary or self.page_boundary == -1],
+                                    key=attrgetter('y')) + \
+                          sorted([h for h in header_contours if h.x >= self.page_boundary and self.page_boundary != -1],
+                                    key=attrgetter('y'))
 
         if self.draw_debug_images:
             canvas = self._thresh.copy()
             for c in header_contours:
-                cv2.circle(canvas,(c.x_mid,c.y_mid),20,self.line_color,35)
+                cv2.circle(canvas, (c.x_mid, c.y_mid), 20, self.line_color, 35)
             reg.cv2_imwrite_safe("headers.tiff", canvas)
 
         return header_contours
 
-    def _sort_business_group_contours(self, contours):
+    def _process_all_contours(self, column_contours, noncolumn_contours):
+        """We redefine this function so we can process the noncolumn contours as well"""
+        business_groups = self._get_sorted_business_groups(column_contours, noncolumn_contours)
+
+        if len(business_groups) == 0:
+            raise reg.RegistryProcessorException("error finding business groups in the document")
+
+        for header, business_group in business_groups:
+            # remove surrounding quotes and newline chars
+            header.text = re.sub(r'^"|\n|"$', ' ', header.text).strip()
+
+            for business in business_group:
+                self._process_contour(business.text, header.text)
+
+    def _get_sorted_business_groups(self, column_contours, header_contours):
         """sort all registry contours in the image based on their business group and position"""
 
-        clustering = self._find_column_locations(contours)
-        column_locations = clustering.cluster_centers_
-
-        # calculate page boundary
-        page_boundary = -1
-        if self.pages_per_image == 2: # if there are two pages find the page boundary
-            sorted_cols = sorted(column_locations)
-            page_boundary = (sorted_cols[self.columns_per_page - 1][0] +
-                             sorted_cols[self.columns_per_page][0]) / (2 * 1.0)
-
-        on_first_page = lambda c: page_boundary == -1 or c.x < page_boundary
+        on_first_page = lambda c: self.page_boundary == -1 or c.x < self.page_boundary
         on_same_page = lambda c1,c2: on_first_page(c1) == on_first_page(c2)
-
-        # seperate headers from columns
-        column_contours, non_column_contours = self._assemble_contour_columns(contours, clustering)
-        header_contours = self._find_headers(non_column_contours, page_boundary)
 
         business_groups = []
 
