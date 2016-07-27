@@ -123,8 +123,8 @@ class RegistryProcessor(object):
          w + int(self._image_width() * self.bb_expansion_percent / 2), \
          h + int(self._image_height() * self.bb_expansion_percent / 2))
 
-    # this is needed when a RegistryProcessor class is copied with copy()
-    # because the api object is likely not thread safe (it could be unnecessary though)
+    # when RegistryProcessor object is copied into a new subprocess
+    # our tess api object needs to be recreated so we made a function to do it
     def make_tess_api(self):
         self._tess_api = TessBaseAPI()
 

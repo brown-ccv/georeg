@@ -13,4 +13,4 @@
 
 # Test
 
-        georeg --year 1979 --state RI --images test/img.png --outdir . --pre-processed
+        georeg_script --year 1979 --state RI --images test/img.png --outdir . --pre-processed

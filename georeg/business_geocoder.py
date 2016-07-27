@@ -25,6 +25,6 @@ def geocode_business(business, state = 'RI', timeout=60):
         business.lat = match["location"]["y"]
         business.long = match["location"]["x"]
 
-    else: 
-        print "Unsuccessful geo-query: %s, %s, %s, %s" % (business.address,
-                business.city, state, business.zip)
+    #TODO: use different method to report failed geocodes
+    # else:
+    #     print "Unsuccessful geo-query: %s, %s, %s, %s" % (business.address, business.city, state, business.zip)
