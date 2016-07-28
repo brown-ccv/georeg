@@ -83,10 +83,9 @@ def worker_thread_f(images, outname, reg_processor, exc_bucket, file_mutex):
 
         # convert into a string for reporting (traceback objects can't be sent across threads)
         exc_trace = ''.join(traceback.format_tb(exc_trace))
-
         exc_bucket.put((exc_type, exc_value, exc_trace))
 
-    return reg_processor.mean_ocr_confidence()
+    return reg_processor.total_ocr_confidence()
 
 if __name__ == "__main__":
     reg_processor = RegistryProcessor()
@@ -158,13 +157,12 @@ if __name__ == "__main__":
 
     # get mean ocr confidence
     mean_conf = 0
-    num_scores = 0
+    total_words = 0
     for result in results:
-        score = result.get()
-        if score != -1:  # -1 means there were no words that were OCRed
-            mean_conf += score
-            num_scores += 1
-    mean_conf /= num_scores * 1.0
+        conf_sum, num_words = result.get()
+        mean_conf += conf_sum
+        total_words += num_words
+    mean_conf /= total_words * 1.0
 
     write_mode = "a"
 

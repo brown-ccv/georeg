@@ -1,12 +1,9 @@
 # coding=utf-8
 import cv2
 import numpy as np
-import tempfile
-import re
 import os
 import csv
 import sys
-import subprocess
 import ConfigParser
 import itertools
 from fuzzywuzzy import fuzz, process
@@ -246,8 +243,6 @@ class RegistryProcessor(object):
             #print contour.text
             total_conf, num_words = self._tess_api.TotalConfidence()
 
-            #print total_conf * 1.0 / num_words
-
             self.confidence_sum += total_conf
             self.num_words += num_words
 
@@ -284,7 +279,12 @@ class RegistryProcessor(object):
 
         raise NotImplementedError
 
+    def total_ocr_confidence(self):
+        """returns (total confidence, number of words) for getting an average over multiple runs"""
+        return (self.confidence_sum, self.num_words)
+
     def mean_ocr_confidence(self):
+        """returns mean confidence so far or -1 if OCR has not been used yet"""
         return self.confidence_sum * 1.0 / self.num_words if self.num_words > 0 else -1
 
     def reset_ocr_confidence(self):
