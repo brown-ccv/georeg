@@ -6,6 +6,9 @@ import csv
 import sys
 import ConfigParser
 import itertools
+import collections
+import business_geocoder as geo
+from math import sqrt
 from fuzzywuzzy import fuzz, process
 from operator import itemgetter, attrgetter
 from sklearn.cluster import KMeans
@@ -158,9 +161,12 @@ class RegistryProcessor(object):
 
         self.std_thresh = 1  # number of standard deviations beyond which contour is no longer considered part of column
 
-        # keep stats on OCR confidence
-        self.confidence_sum = 0
+        # performance & accuracy stats
+        self.ocr_confidence_sum = 0
         self.num_words = 0
+        self.num_geo_successes = 0
+        self.num_geo_attempts = 0
+        self.per_image_business_counts = []
 
         self.draw_debug_images = False  # turning this on can help with debugging
         self.assume_pre_processed = False  # assume images are preprocessed so to not waste extra computational power
@@ -174,9 +180,11 @@ class RegistryProcessor(object):
 
         # initialize city lookup for this state
         self.state = state
-        self._city_lists_path = os.path.join(_datadir, "%s-cities.txt" % (self.state,))
+        self._city_lists_path = os.path.join(_datadir, "%s-cities.txt" % self.state)
         self._city_detector = CityDetector()
         self._city_detector.load_cities(self._city_lists_path)
+
+        self.year = year
 
         # load config file from this state & year
         basepath = georeg.__path__[0]
@@ -229,6 +237,7 @@ class RegistryProcessor(object):
         # set the image tesseract will work with
         self._tess_api.SetImage(self._thresh)
 
+        # OCR our column contours
         for contour in itertools.chain.from_iterable(column_contours):
             x,y,w,h = self._expand_bb(contour.x,contour.y,contour.w,contour.h)
 
@@ -240,12 +249,12 @@ class RegistryProcessor(object):
             self._tess_api.SetRectangle(x,y,w,h)
             contour.text = self._tess_api.GetUTF8Text()
 
-            #print contour.text
             total_conf, num_words = self._tess_api.TotalConfidence()
 
-            self.confidence_sum += total_conf
+            self.ocr_confidence_sum += total_conf
             self.num_words += num_words
 
+        # OCR our noncolumn contours of interest
         for contour in noncolumn_contours:
             x, y, w, h = self._expand_bb(contour.x, contour.y, contour.w, contour.h)
 
@@ -261,35 +270,109 @@ class RegistryProcessor(object):
             # write original image with added contours to disk
             cv2_imwrite_safe(os.path.join(self.debugdir, "contoured.tiff"), contoured)
 
-        self._process_all_contours(column_contours, noncolumn_contours)
+        # get our custom call args if any
+        call_args = self._define_contour_call_args(column_contours, noncolumn_contours)
+
+        num_businesses_found = 0
+
+        # here we process all of our contours
+        for args in call_args:
+            if isinstance(args, collections.Sequence) and not isinstance(args, basestring):
+                business = self._process_contour(*args)
+                contour_txt = args[0]
+            else:
+                business = self._process_contour(args)
+                contour_txt = args
+
+            if business is None:
+                return
+
+            # record business
+            self.businesses.append(business)
+
+            # if address was found attempt to geocode
+            if business.address:
+                num_businesses_found += 1
+                self.num_geo_attempts += 1
+
+                result = geo.geocode_business(business, self.state)
+                if not result:
+                    with open(os.path.join(self.debugdir, "unsucessful_geo-queries_%d.log" % self.year), "a") as file:
+                        file.write("Unsuccessful geo-query from %s:\n" % os.path.basename(path))
+                        file.write("\naddress: %s, city: %s, state: %s, zip: %s\n" % (
+                            business.address, business.city, self.state, business.zip))
+                        file.write(contour_txt)  # write contour text
+                        file.write("\n\n")
+                else:
+                    self.num_geo_successes += 1
+
+        # record the number of businesses found in this image
+        self.per_image_business_counts.append(num_businesses_found)
 
     def _get_noncolumn_contours_of_interest(self, noncolumn_contours):
-        """override this if your class is interested in non-column contours"""
+        """
+        override this if your class is interested in non-column contours (i.e. headers)
+        :param noncolumn_contours: noncolumn contours found
+        :return: a list of noncolumn contours we are inerested in
+        """
         return []
 
-    def _process_all_contours(self, column_contours, noncolumn_contours):
-        """Accepts relevant contours found in an image and processes them.
-            Override this if there are noncolumn contours you need to process"""
+    def _define_contour_call_args(self, column_contours, noncolumn_contours):
+        """
+        override this if _process_contour() needs to be called with additional arguments (like the text of the header it is under)
+        :param column_contours: a 2d list were each column is a column and each row is a contour (of type 'Contour')
+        :param noncolumn_contours: a 1d list of all non-column contours in the image (of type 'Contour')
+        :return: a list of argument tuples that will each be passed to a _process_contour() call
+                (first argument must be the contour text)
+        """
+        return (c.text for c in itertools.chain.from_iterable(column_contours))
 
-        for contour in itertools.chain.from_iterable(column_contours):
-            self._process_contour(contour.text)
-
-    def _process_contour(self, contour_txt):
-        """process the text of a contour"""
-
+    def _process_contour(self, contour_txt, *args):
+        """
+        Process the text of a contour to make a business object,
+        may also be passed info about non-column contours if
+        _get_noncolumn_contours_of_interest() and _define_contour_call_args()
+        are overriden
+        :param contour_txt: the text in the contour
+        :param args: optional additional information
+        :return: a business object representing the contour's text or None
+        """
         raise NotImplementedError
 
     def total_ocr_confidence(self):
         """returns (total confidence, number of words) for getting an average over multiple runs"""
-        return (self.confidence_sum, self.num_words)
+        return (self.ocr_confidence_sum, self.num_words)
 
     def mean_ocr_confidence(self):
         """returns mean confidence so far or -1 if OCR has not been used yet"""
-        return self.confidence_sum * 1.0 / self.num_words if self.num_words > 0 else -1
+        return self.ocr_confidence_sum * 1.0 / self.num_words if self.num_words > 0 else -1
 
-    def reset_ocr_confidence(self):
-        self.confidence_sum = 0
+    #TODO: reimplement success rate tracking once our geocoder returns results below 75%
+    # i.e. return mean ocr confidence instead of success rate
+    def geocoder_success_rate(self):
+        """returns geocoder success rate or -1 if not valid"""
+        return (self.num_geo_successes * 1.0 / self.num_geo_attempts) * 100 if self.num_geo_attempts > 0 else -1
+
+    def businesses_per_image_std(self):
+        """returns the standard deviation of the number of businesses found per image or -1 if not valid,
+        a high std means we are likely not finding all business contours"""
+
+        if len(self.per_image_business_counts) == 0:
+            return -1
+
+        mean_bus_count = sum(self.per_image_business_counts) * 1.0 / len(self.per_image_business_counts)
+        dists_from_mean = ((mean_bus_count - c)**2 for c in self.per_image_business_counts)
+        variance = sum(dists_from_mean) / len(self.per_image_business_counts)
+
+        return sqrt(variance)
+
+    def reset_stats(self):
+        """resets all performance stats being recorded by registry_processor"""
+        self.ocr_confidence_sum = 0
         self.num_words = 0
+        self.num_geo_successes = 0
+        self.num_geo_attempts = 0
+        self.per_image_business_counts = []
 
     def load_from_tsv(self, path):
         """load self.businesses from a tsv file where they were previously saved"""
@@ -539,6 +622,8 @@ class DummyTextRecorder(RegistryProcessor):
 
     def _process_contour(self, contour_txt):
         self.registry_txt += "\n" + contour_txt
+
+        return None
 
     def record_to_tsv(self, path, mode = 'w'):
         with open(path, mode) as file:

@@ -5,7 +5,6 @@ import re
 import numpy as np
 
 import registry_processor as reg
-import business_geocoder as geo
 
 
 def generate_rect(x1, x2, y1, y2):
@@ -27,23 +26,19 @@ class RegistryProcessorTX(reg.RegistryProcessor):
 
         self.current_city = ""
 
+        self.fails = 0
+        self.successes = 0
+
     def _process_contour(self, contour_txt):
         registry_match = self.registry_pattern.search(contour_txt)
         city_match = self.city_pattern.search(contour_txt)
 
         if registry_match:
-            business = self._parse_registry_block(contour_txt)
-            
-            if business.address:
-                try:
-                    geo.geocode_business(business, self.state)
-                except:
-                    print("Unable to geocode: %s" % business.address)
-
-            self.businesses.append(business)
-
+            return self._parse_registry_block(contour_txt)
         elif city_match:
             self.current_city = city_match.group(1)
+
+        return None
 
 
 class RegistryProcessorOldTX(RegistryProcessorTX):
@@ -55,7 +50,6 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
 
         image, contours, hierarchy = super(RegistryProcessorOldTX,
                                            self)._get_contours(*args, **kwargs)
-
         split_contours = []
 
         for c in contours:
@@ -214,12 +208,13 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _process_contour(self, contour_txt):
-        super(RegistryProcessor1965, self)._process_contour(contour_txt)
+        business = super(RegistryProcessor1965, self)._process_contour(contour_txt)
 
         city_match = self.city_pattern.search(contour_txt)
         if city_match:
             self.current_zip = city_match.group(2)
 
+        return business
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -258,7 +253,6 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
         return business
 
 
-
 class RegistryProcessor1975(RegistryProcessorOldTX):
     """1975 TX registry parser."""
 
@@ -269,9 +263,8 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         self.registry_pattern = re.compile(r'[\[\]()]')
         self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
         self.name_pattern_2 = re.compile(r'(.+?),')
-        self.address_pattern = re.compile(r'(.+?)\(.*(\d{5})\)\s*\[(.*)\]')
+        self.address_pattern = re.compile(r'(.*)\(.*(\d{5})\)\s*\[(.*)\]')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
-
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()

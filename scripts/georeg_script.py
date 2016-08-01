@@ -21,7 +21,8 @@ parser.add_argument(
         Append to the output file instead of overwriting it.""")
 parser.add_argument(
     "--debug", action="store_true", help="""
-        Draw images showing intermediate output during processing.""")
+        Draw images showing intermediate output during processing.
+        (also turns off multiprocessing)""")
 parser.add_argument(
     "--pre-processed", action="store_true", help="""
         Assume images have been preprocessed by scan-tailor.""")
@@ -61,16 +62,17 @@ elif args.state == 'TX':
         from georeg.registry_processor_tx import RegistryProcessor1950s as RegistryProcessor
     else:
         raise ValueError("%d is not a supported year for TX" % (args.year))
-
 else:
     raise ValueError("%s is not a supported state" % (args.state))
 
-def worker_thread_f(images, outname, reg_processor, exc_bucket, file_mutex):
+def subprocess_f(images, outname, reg_processor, exc_bucket, file_mutex, print_mutex):
     try:
         reg_processor.make_tess_api()
 
         for n, image in enumerate(images):
+            print_mutex.acquire()
             print "processing: %s (%d/%d)" % (image, n + 1, len(images))
+            print_mutex.release()
 
             reg_processor.process_image(image)
 
@@ -85,7 +87,8 @@ def worker_thread_f(images, outname, reg_processor, exc_bucket, file_mutex):
         exc_trace = ''.join(traceback.format_tb(exc_trace))
         exc_bucket.put((exc_type, exc_value, exc_trace))
 
-    return reg_processor.total_ocr_confidence()
+    # return performance stats
+    return (reg_processor.mean_ocr_confidence(), reg_processor.geocoder_success_rate(), reg_processor.businesses_per_image_std())
 
 if __name__ == "__main__":
     reg_processor = RegistryProcessor()
@@ -101,6 +104,7 @@ if __name__ == "__main__":
     manager = multiprocessing.Manager()
     exc_bucket = manager.Queue()
     tsv_file_mutex = manager.Lock()
+    print_mutex = manager.Lock()
 
     # truncate file if we aren't suppose to append
     if not args.append:
@@ -117,65 +121,88 @@ if __name__ == "__main__":
 
     # find number of cores
     try:
-        num_threads = multiprocessing.cpu_count()
+        num_processes = multiprocessing.cpu_count()
     except NotImplementedError:
         print >> sys.stderr, "unable to detect number of cores... defaulting to 4 threads"
-        num_threads = 4
+        num_processes = 4
 
-    # TODO: make this a process pool to avoid GIL
+    if args.debug: # if we are looking at debug images we don't want them being written to by 4 processes at once
+        num_processes = 1
+
     # intialize some threading variables
-    images_per_thread = len(image_list) / num_threads
-    pool = multiprocessing.Pool(processes=num_threads)
+    images_per_process = len(image_list) / num_processes
+    pool = multiprocessing.Pool(processes=num_processes)
     results = []
 
     start_time = time.time()
 
-    # start threads
-    for i in xrange(num_threads):
+    file = open(os.path.join(args.outdir, "unsucessful_geo-queries_%d.log" % args.year), "w")
+    file.close()
+
+    # start subprocesses
+    for i in xrange(num_processes):
         assigned_images = []
 
-        if i == num_threads - 1:
-            assigned_images = image_list[i * images_per_thread:]
+        if i == num_processes - 1:
+            assigned_images = image_list[i * images_per_process:]
         else:
-            assigned_images = image_list[i * images_per_thread:(i + 1) * images_per_thread]
+            assigned_images = image_list[i * images_per_process:(i + 1) * images_per_process]
 
-        results.append(pool.apply_async(worker_thread_f, (assigned_images, outname, reg_processor, exc_bucket, tsv_file_mutex)))
+        results.append(pool.apply_async(subprocess_f, (assigned_images, outname, reg_processor, exc_bucket, tsv_file_mutex, print_mutex)))
 
     pool.close()
     pool.join()
 
-    num_failed_threads = 0
+    num_failed_processes = 0
 
-    # print exception information of failed threads
+    # print exception information of failed processes
     while not exc_bucket.empty():
         exc_type, exc_value, exc_trace = exc_bucket.get()
 
-        print >> sys.stderr, "Exception in worker thread:", exc_type, exc_value
+        print >> sys.stderr, "Exception in subprocess:", exc_type, exc_value
         print >> sys.stderr, "Trace back:\n", exc_trace
 
-        num_failed_threads += 1
+        num_failed_processes += 1
 
-    # get mean ocr confidence
-    mean_conf = 0
-    total_words = 0
+    # get performance stats from each subprocess
+    ocr_conf_scores = []
+    geo_success_rates = []
+    bus_count_stds = []
     for result in results:
-        conf_sum, num_words = result.get()
-        mean_conf += conf_sum
-        total_words += num_words
-    mean_conf /= total_words * 1.0
+        ocr_conf_score, geo_success_rate, bus_count_std = result.get()
+
+        if ocr_conf_score != -1:
+            ocr_conf_scores.append(ocr_conf_score)
+        if geo_success_rate != -1:
+            geo_success_rates.append(geo_success_rate)
+        if bus_count_std != -1:
+            bus_count_stds.append(bus_count_std)
+
+    # get mean of each score
+    mean_ocr_conf = sum(ocr_conf_scores) / len(ocr_conf_scores) * 1.0 if len(ocr_conf_scores) > 0 else -1
+    mean_geo_sucess_rate = sum(geo_success_rates) / len(geo_success_rates) * 1.0 if len(geo_success_rates) > 0 else -1
+    mean_bus_count_std = sum(bus_count_stds) / len(bus_count_stds) * 1.0 if len(bus_count_stds) > 0 else -1
 
     write_mode = "a"
 
-    if not os.path.exists(os.path.join(args.outdir, "OCR_confidence.txt")):
+    if not os.path.exists(os.path.join(args.outdir, "performance_stats.txt")):
         write_mode = "w"
 
-    with open(os.path.join(args.outdir, "OCR_confidence.txt"), write_mode) as conf_file:
-        conf_file.write("year: %d finished with average confidence: %f%%\n" % (args.year, mean_conf))
+    # record performance stats
+    with open(os.path.join(args.outdir, "performance_stats.txt"), write_mode) as conf_file:
+        conf_file.write("state: %s\n"
+                        "year: %d\n"
+                        "ocr confidence: %f%%\n"
+                        "geocoder success rate: %f%%\n"
+                        "businesses per image deviation: %f\n\n"
+                        % (args.state,args.year, mean_ocr_conf, mean_geo_sucess_rate, mean_bus_count_std))
 
     elapsed_time = time.time() - start_time
 
-    print "Mean OCR confidence: %d%%" % mean_conf
-    print "Number of failed threads: %d" % num_failed_threads
+    print "Mean OCR confidence: %f%%" % mean_ocr_conf
+    print "Geocoder success rate: %f%%" % mean_geo_sucess_rate
+    print "Businesses per image deviation: %f" % mean_bus_count_std
+    print "Number of failed processes: %d" % num_failed_processes
     print "Elapsed time: %d hours, %d minutes and %d seconds" % (elapsed_time / 60 ** 2, (elapsed_time % 60 ** 2) / 60, (elapsed_time % 60 ** 2) % 60)
 
     print "done"

@@ -16,7 +16,7 @@ def geocode_business(business, state = 'RI', timeout=60):
     try:
         location = geolocator.geocode(street=business.address, city=business.city,
                 state=state, zip_cd=business.zip, n_matches = 1, timeout = timeout)
-    except geopy.exc.ConfigurationError:
+    except:
         location = None
 
     if location:
@@ -24,7 +24,6 @@ def geocode_business(business, state = 'RI', timeout=60):
         business.confidence_score = float(match["score"])
         business.lat = match["location"]["y"]
         business.long = match["location"]["x"]
-
-    #TODO: use different method to report failed geocodes
-    # else:
-    #     print "Unsuccessful geo-query: %s, %s, %s, %s" % (business.address, business.city, state, business.zip)
+        return True
+    else:
+        return False

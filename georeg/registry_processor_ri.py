@@ -31,9 +31,10 @@ class RegistryProcessorNew(reg.RegistryProcessor):
             business.category = self.current_sic
 
             geo.geocode_business(business)
-            self.businesses.append(business)
+            return business
         elif sic_match:
             self.current_sic = sic_match.group(0)
+        return None
 
 
     def _parse_registry_block(self, registry_txt):
@@ -87,7 +88,7 @@ class RegistryRecorder(RegistryProcessorNew):
             lines = contour_txt.split("\n")
 
             if len(lines) < 2:
-                return
+                return None
 
             lines[0] = self.name_start_token + " " + lines[0] + " " + self.end_token
             lines[1] = self.address_start_token + " " + lines[1] + " " + self.end_token
@@ -96,6 +97,7 @@ class RegistryRecorder(RegistryProcessorNew):
             self.registry_txt += " ".join(lines)
             self.registry_txt += "\n" + self.bus_end_token + "\n"
 
+        return None
     def record_to_tsv(self, path, mode='w'):
         with open(path, mode) as file:
             file.write(self.registry_txt)
@@ -124,7 +126,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                 business.zip = self.current_zip
 
             geo.geocode_business(business)
-            self.businesses.append(business)
+            return business
         else:  # check if city header
             segments = contour_txt.rpartition(" ")
             zip = ""
@@ -139,6 +141,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             if match_city:
                 self.current_city = match_city
                 self.current_zip = zip
+        return None
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1953-1975"""
@@ -191,19 +194,22 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         return header_contours
 
-    def _process_all_contours(self, column_contours, noncolumn_contours):
-        """We redefine this function so we can process the noncolumn contours as well"""
+    def _define_contour_call_args(self, column_contours, noncolumn_contours):
         business_groups = self._get_sorted_business_groups(column_contours, noncolumn_contours)
 
         if len(business_groups) == 0:
             raise reg.RegistryProcessorException("error finding business groups in the document")
+
+        call_args = []
 
         for header, business_group in business_groups:
             # remove surrounding quotes and newline chars
             header.text = re.sub(r'^"|\n|"$', ' ', header.text).strip()
 
             for business in business_group:
-                self._process_contour(business.text, header.text)
+                call_args.append((business.text,header.text))
+
+        return call_args
 
     def _get_sorted_business_groups(self, column_contours, header_contours):
         """sort all registry contours in the image based on their business group and position"""
