@@ -536,7 +536,7 @@ class RegistryProcessor1999(RegistryProcessorTX):
             if start:
                 if end:
                     break
-                full_address += ' '+line
+                full_address += ' ' + line
 
         match = self.paren_pattern.search(full_address)
         if match:

@@ -96,7 +96,10 @@ if __name__ == "__main__":
 
     reg_processor.draw_debug_images = args.debug
     reg_processor.assume_pre_processed = args.pre_processed
-    reg_processor.debugdir = args.outdir
+    reg_processor.outdir = args.outdir
+
+    # delete old geoquery log file
+    reg_processor.remove_geoquery_log()
 
     outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
 
@@ -135,9 +138,6 @@ if __name__ == "__main__":
     results = []
 
     start_time = time.time()
-
-    file = open(os.path.join(args.outdir, "unsucessful_geo-queries_%d.log" % args.year), "w")
-    file.close()
 
     # start subprocesses
     for i in xrange(num_processes):

@@ -123,6 +123,10 @@ class RegistryProcessor(object):
          w + int(self._image_width() * self.bb_expansion_percent / 2), \
          h + int(self._image_height() * self.bb_expansion_percent / 2))
 
+    def _geoquery_log_fn(self):
+        assert(self.state != "" and self.year != -1)
+        return os.path.join(self.outdir, "unsucessful_geo-queries_%s_%d.log" % (self.state, self.year))
+
     # when RegistryProcessor object is copied into a new subprocess
     # our tess api object needs to be recreated so we made a function to do it
     def make_tess_api(self):
@@ -171,9 +175,12 @@ class RegistryProcessor(object):
         self.draw_debug_images = False  # turning this on can help with debugging
         self.assume_pre_processed = False  # assume images are preprocessed so to not waste extra computational power
         self.line_color = (130, 130, 130)  # NOTE: line color for debug images, must be visible in grayscale
-        self.debugdir = ""  # dir to which to write debug images
+        self.outdir = "."  # dir to write debug images, logs and tsv results
 
         self.businesses = []
+
+        self.state = ""
+        self.year = -1
 
     #initialize this object for the specified state and year (if not done already)
     def initialize_state_year(self, state, year):
@@ -222,7 +229,7 @@ class RegistryProcessor(object):
             canvas = np.zeros(self._image.shape,self._image.dtype)
             cv2.drawContours(canvas,[c.data for c in
                 contours],-1,self.line_color,-1)
-            cv2_imwrite_safe(os.path.join(self.debugdir, "closed.tiff"),canvas)
+            cv2_imwrite_safe(os.path.join(self.outdir, "closed.tiff"), canvas)
 
         clustering = self._find_column_locations(contours)
         column_contours, noncolumn_contours = self._make_contour_columns(contours, clustering)
@@ -268,24 +275,29 @@ class RegistryProcessor(object):
 
         if self.draw_debug_images:
             # write original image with added contours to disk
-            cv2_imwrite_safe(os.path.join(self.debugdir, "contoured.tiff"), contoured)
+            cv2_imwrite_safe(os.path.join(self.outdir, "contoured.tiff"), contoured)
 
         # get our custom call args if any
         call_args = self._define_contour_call_args(column_contours, noncolumn_contours)
 
         num_businesses_found = 0
 
+        if not os.path.exists(self._geoquery_log_fn()): # if the log doesn't exist make it
+            file = open(self._geoquery_log_fn(), "w")
+            file.close()
+
         # here we process all of our contours
         for args in call_args:
+            # if args is indeed multiple arguments then we'll expand them
             if isinstance(args, collections.Sequence) and not isinstance(args, basestring):
                 business = self._process_contour(*args)
                 contour_txt = args[0]
-            else:
+            else: # otherwise we treat it like one argument
                 business = self._process_contour(args)
                 contour_txt = args
 
             if business is None:
-                return
+                continue
 
             # record business
             self.businesses.append(business)
@@ -297,12 +309,15 @@ class RegistryProcessor(object):
 
                 result = geo.geocode_business(business, self.state)
                 if not result:
-                    with open(os.path.join(self.debugdir, "unsucessful_geo-queries_%d.log" % self.year), "a") as file:
+                    with open(self._geoquery_log_fn(), "a") as file:
                         file.write("Unsuccessful geo-query from %s:\n" % os.path.basename(path))
-                        file.write("\naddress: %s, city: %s, state: %s, zip: %s\n" % (
-                            business.address, business.city, self.state, business.zip))
-                        file.write(contour_txt)  # write contour text
-                        file.write("\n\n")
+                        file.write("name: \"%s\" address: \"%s\", city: \"%s\", zip: \"%s\"\n" % (
+                            business.name, business.address, business.city, business.zip))
+                        file.write("=" * 100 + "\n")
+                        file.write("Contour Text:\n")
+                        file.write("=" * 100 + "\n")
+                        file.write(contour_txt.strip() + "\n")  # write contour text
+                        file.write("=" * 100 + "\n\n")
                 else:
                     self.num_geo_successes += 1
 
@@ -338,6 +353,11 @@ class RegistryProcessor(object):
         :return: a business object representing the contour's text or None
         """
         raise NotImplementedError
+
+    def remove_geoquery_log(self):
+        """if this isn't called the existing file will simply be appended to"""
+        if (os.path.exists(self._geoquery_log_fn())):
+            os.remove(self._geoquery_log_fn())
 
     def total_ocr_confidence(self):
         """returns (total confidence, number of words) for getting an average over multiple runs"""
@@ -553,7 +573,7 @@ class RegistryProcessor(object):
                     self._image_height()),cluster_colors[ix],20)
 
             # draw column lines to file
-            cv2_imwrite_safe(os.path.join(self.debugdir, "column_lines.tiff"), canvas)
+            cv2_imwrite_safe(os.path.join(self.outdir, "column_lines.tiff"), canvas)
 
             # draw contour widths in color of assigned cluster
             canvas = self._thresh.copy()
@@ -565,7 +585,7 @@ class RegistryProcessor(object):
                 cv2.line(canvas,(left, y),(right, y),col,10)
 
             # draw clustered column widths to file
-            cv2_imwrite_safe(os.path.join(self.debugdir, "clusters.tiff"), canvas)
+            cv2_imwrite_safe(os.path.join(self.outdir, "clusters.tiff"), canvas)
 
         return clustering
 
