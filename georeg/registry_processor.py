@@ -66,12 +66,13 @@ class Business:
 
 
 class Contour:
-    def __init__(self, contour=None):
-        self.data = contour
+    def __init__(self, contour_data=None):
+        self.data = contour_data
         self.text = ""
+        self.font_attrs = []
 
-        if contour is not None:
-            [self.x, self.y, self.w, self.h] = cv2.boundingRect(contour)
+        if contour_data is not None:
+            [self.x, self.y, self.w, self.h] = cv2.boundingRect(contour_data)
             self.x_mid = self.x + self.w / 2
             self.y_mid = self.y + self.h / 2
         else:
@@ -254,7 +255,7 @@ class RegistryProcessor(object):
 
             # specify region tesseract should ocr
             self._tess_api.SetRectangle(x,y,w,h)
-            contour.text = self._tess_api.GetUTF8Text()
+            contour.text, contour.text_attrs = self._tess_api.GetTextWithAttrs()
 
             total_conf, num_words = self._tess_api.TotalConfidence()
 
@@ -271,7 +272,7 @@ class RegistryProcessor(object):
 
             # specify region tesseract should ocr
             self._tess_api.SetRectangle(x, y, w, h)
-            contour.text = self._tess_api.GetUTF8Text()
+            contour.text, contour.text_attrs = self._tess_api.GetTextWithAttrs()
 
         if self.draw_debug_images:
             # write original image with added contours to disk
@@ -338,11 +339,11 @@ class RegistryProcessor(object):
         :param column_contours: a 2d list were each column is a column and each row is a contour (of type 'Contour')
         :param noncolumn_contours: a 1d list of all non-column contours in the image (of type 'Contour')
         :return: a list of argument tuples that will each be passed to a _process_contour() call
-                (first argument must be the contour text)
+                (1st arg must be the contour text, and 2nd must be the contour text attributes)
         """
-        return (c.text for c in itertools.chain.from_iterable(column_contours))
+        return ((c.text, c.text_attrs) for c in itertools.chain.from_iterable(column_contours))
 
-    def _process_contour(self, contour_txt, *args):
+    def _process_contour(self, contour_txt, countor_font_attrs, *args):
         """
         Process the text of a contour to make a business object,
         may also be passed info about non-column contours if

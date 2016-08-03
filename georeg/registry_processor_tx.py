@@ -29,7 +29,7 @@ class RegistryProcessorTX(reg.RegistryProcessor):
         self.fails = 0
         self.successes = 0
 
-    def _process_contour(self, contour_txt):
+    def _process_contour(self, contour_txt, contour_font_attrs):
         registry_match = self.registry_pattern.search(contour_txt)
         city_match = self.city_pattern.search(contour_txt)
 
@@ -207,7 +207,7 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
         self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
-    def _process_contour(self, contour_txt):
+    def _process_contour(self, contour_txt, contour_font_attrs):
         business = super(RegistryProcessor1965, self)._process_contour(contour_txt)
 
         city_match = self.city_pattern.search(contour_txt)

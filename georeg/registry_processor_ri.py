@@ -22,7 +22,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
         self.registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
         self.sic_pattern = re.compile(r'\d{4}')
 
-    def _process_contour(self, contour_txt):
+    def _process_contour(self, contour_txt, contour_font_attrs):
         registry_match = self.registry_pattern.match(contour_txt)
         sic_match = self.sic_pattern.match(contour_txt)
 
@@ -78,7 +78,7 @@ class RegistryRecorder(RegistryProcessorNew):
 
         self.registry_txt = ""
 
-    def _process_contour(self, contour_txt):
+    def _process_contour(self, contour_txt, contour_font_attrs):
         """works for registries from 1975-onward"""
 
         registry_match = self.registry_pattern.match(contour_txt)
@@ -116,7 +116,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
 
         self.line_color = (130,130,130)
 
-    def _process_contour(self, contour_txt, header_str):
+    def _process_contour(self, contour_txt, contour_font_attrs, header_str):
         if contour_txt.count("\n") > 0:  # if the contour's text has 2 or more lines consider it a registry
             business = self._parse_registry_block(contour_txt)
             business.category = header_str
@@ -207,7 +207,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             header.text = re.sub(r'^"|\n|"$', ' ', header.text).strip()
 
             for business in business_group:
-                call_args.append((business.text,header.text))
+                call_args.append((business.text, business.text_attrs, header.text))
 
         return call_args
 
