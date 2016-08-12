@@ -67,14 +67,14 @@ class RegistryRecorder(RegistryProcessorNew):
     def __init__(self):
         super(RegistryRecorder, self).__init__()
 
-        self.bus_start_token = "<BUS_START>"
-        self.bus_end_token = "<BUS_END>"
+        self._start = lambda prefix: prefix + "_START>"
+        self._end = lambda prefix: prefix + "_END>"
 
-        self.name_start_token = "<NAME_START>"
-        self.bus_type_start_token = "<BUS_TYPE_START>"
-        self.address_start_token = "<ADDRESS_START>"
+        self.bus_prefix = "<BUS" # tag that starts a registry block
 
-        self.end_token = "<FIELD_END>"
+        self.name_prefix = "<NAME"
+        self.bus_type_prefix = "<BUS_TYPE"
+        self.address_prefix = "<ADDRESS"
 
         self.registry_txt = ""
 
@@ -90,12 +90,12 @@ class RegistryRecorder(RegistryProcessorNew):
             if len(lines) < 2:
                 return None
 
-            lines[0] = self.name_start_token + " " + lines[0] + " " + self.end_token
-            lines[1] = self.address_start_token + " " + lines[1] + " " + self.end_token
+            lines[0] = self._start(self.name_prefix) + " " + lines[0] + " " + self._end(self.name_prefix)
+            lines[1] = self._start(self.address_prefix) + " " + lines[1] + " " + self._end(self.address_prefix)
 
-            self.registry_txt += "\n" + self.bus_start_token + "\n"
+            self.registry_txt += "\n" + self._start(self.bus_prefix) + "\n"
             self.registry_txt += " ".join(lines)
-            self.registry_txt += "\n" + self.bus_end_token + "\n"
+            self.registry_txt += "\n" + self._end(self.bus_prefix) + "\n"
 
         return None
     def record_to_tsv(self, path, mode='w'):

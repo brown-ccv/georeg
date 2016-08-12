@@ -112,17 +112,20 @@ def cv2_imwrite_safe(*args, **kwargs):
 class RegistryProcessor(object):
 
     # lambdas were no longer sufficient with multiple threads for some reason
+    @property
     def _image_height(self):
         return self._image.shape[0]
+
+    @property
     def _image_width(self):
         return self._image.shape[1]
 
     def _expand_bb(self, x, y, w, h):
         return \
-        (x - int(self._image_width() * self.bb_expansion_percent / 2), \
-         y - int(self._image_height() * self.bb_expansion_percent / 2), \
-         w + int(self._image_width() * self.bb_expansion_percent / 2), \
-         h + int(self._image_height() * self.bb_expansion_percent / 2))
+        (x - int(self._image_width * self.bb_expansion_percent / 2), \
+         y - int(self._image_height * self.bb_expansion_percent / 2), \
+         w + int(self._image_width * self.bb_expansion_percent / 2), \
+         h + int(self._image_height * self.bb_expansion_percent / 2))
 
     def _geoquery_log_fn(self):
         assert(self.state != "" and self.year != -1)
@@ -487,8 +490,8 @@ class RegistryProcessor(object):
         filtered_contours = []
 
         for contour in contours:
-            if (contour.x == 1 or contour.x + contour.w == self._image_width() - 1) or \
-            (contour.y == 1 or contour.y + contour.h == self._image_height() - 1):
+            if (contour.x == 1 or contour.x + contour.w == self._image_width - 1) or \
+            (contour.y == 1 or contour.y + contour.h == self._image_height - 1):
                 continue
 
             filtered_contours.append(contour)
@@ -569,9 +572,9 @@ class RegistryProcessor(object):
             for ix, column_l in enumerate(clustering.cluster_centers_):
                 left, right = int(column_l[0]), int(column_l[1])
                 cv2.line(canvas,(left, 0),(left,
-                    self._image_height()),cluster_colors[ix],20)
+                    self._image_height),cluster_colors[ix],20)
                 cv2.line(canvas,(right, 0),(right,
-                    self._image_height()),cluster_colors[ix],20)
+                    self._image_height),cluster_colors[ix],20)
 
             # draw column lines to file
             cv2_imwrite_safe(os.path.join(self.outdir, "column_lines.tiff"), canvas)
