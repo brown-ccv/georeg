@@ -11,11 +11,17 @@ import multiprocessing
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
 parser.add_argument(
+    "--images", "-i", required=True, help="""
+        Path of images to process (not a list, use unix file matching).""")
+parser.add_argument(
+    "--state", "-s", default="", required=True, help="""
+        US state to get city list.""")
+parser.add_argument(
     "--year", "-y", type=int, required=True, help="""
         The year of the registry.""")
 parser.add_argument(
-    "--images", "-i", required=True, help="""
-        Path of images to process (not a list, use unix file matching).""")
+    "--outdir", "-o", required=True, help="""
+        Path to the directory to write out results.""")
 parser.add_argument(
     "--append", action="store_true", help="""
         Append to the output file instead of overwriting it.""")
@@ -27,11 +33,10 @@ parser.add_argument(
     "--pre-processed", action="store_true", help="""
         Assume images have been preprocessed by scan-tailor.""")
 parser.add_argument(
-    "--outdir", "-o", required=True, help="""
-        Path to the directory to write out results.""")
-parser.add_argument(
-    "--state", "-s", default="", required=True, help="""
-        US state to get city list.""")
+    "--text-dump-mode", action="store_true", help="""
+    If this option is specified georeg will only ocr and record
+    business contour text *without* processing anything"""
+)
 
 args = parser.parse_args()
 
@@ -64,6 +69,9 @@ elif args.state == 'TX':
         raise ValueError("%d is not a supported year for TX" % (args.year))
 else:
     raise ValueError("%s is not a supported state" % (args.state))
+
+if args.text_dump_mode:
+    from georeg.registry_processor import DummyTextRecorder as RegistryProcessor
 
 def subprocess_f(images, outname, reg_processor, exc_bucket, file_mutex, print_mutex):
     try:
@@ -101,7 +109,10 @@ if __name__ == "__main__":
     # delete old geoquery log file
     reg_processor.remove_geoquery_log()
 
-    outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
+    if args.text_dump_mode:
+        outname = "%s/%d-text-dump.txt" % (args.outdir, args.year)
+    else:
+        outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
 
     # make some variables to be shared with subprocesses
     manager = multiprocessing.Manager()

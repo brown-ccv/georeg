@@ -120,16 +120,17 @@ class RegistryProcessor(object):
     def _image_width(self):
         return self._image.shape[1]
 
+    @property
+    def _geoquery_log_fn(self):
+        assert (self.state != "" and self.year != -1)
+        return os.path.join(self.outdir, "unsucessful_geo-queries_%s_%d.log" % (self.state, self.year))
+
     def _expand_bb(self, x, y, w, h):
         return \
         (x - int(self._image_width * self.bb_expansion_percent / 2), \
          y - int(self._image_height * self.bb_expansion_percent / 2), \
          w + int(self._image_width * self.bb_expansion_percent / 2), \
          h + int(self._image_height * self.bb_expansion_percent / 2))
-
-    def _geoquery_log_fn(self):
-        assert(self.state != "" and self.year != -1)
-        return os.path.join(self.outdir, "unsucessful_geo-queries_%s_%d.log" % (self.state, self.year))
 
     # when RegistryProcessor object is copied into a new subprocess
     # our tess api object needs to be recreated so we made a function to do it
@@ -178,6 +179,7 @@ class RegistryProcessor(object):
 
         self.draw_debug_images = False  # turning this on can help with debugging
         self.assume_pre_processed = False  # assume images are preprocessed so to not waste extra computational power
+
         self.line_color = (130, 130, 130)  # NOTE: line color for debug images, must be visible in grayscale
         self.outdir = "."  # dir to write debug images, logs and tsv results
 
@@ -286,8 +288,8 @@ class RegistryProcessor(object):
 
         num_businesses_found = 0
 
-        if not os.path.exists(self._geoquery_log_fn()): # if the log doesn't exist make it
-            file = open(self._geoquery_log_fn(), "w")
+        if not os.path.exists(self._geoquery_log_fn): # if the log doesn't exist make it
+            file = open(self._geoquery_log_fn, "w")
             file.close()
 
         # here we process all of our contours
@@ -313,7 +315,7 @@ class RegistryProcessor(object):
 
                 result = geo.geocode_business(business, self.state)
                 if not result:
-                    with open(self._geoquery_log_fn(), "a") as file:
+                    with open(self._geoquery_log_fn, "a") as file:
                         file.write("Unsuccessful geo-query from %s:\n" % os.path.basename(path))
                         file.write("name: \"%s\" address: \"%s\", city: \"%s\", zip: \"%s\"\n" % (
                             business.name, business.address, business.city, business.zip))
@@ -360,8 +362,8 @@ class RegistryProcessor(object):
 
     def remove_geoquery_log(self):
         """if this isn't called the existing file will simply be appended to"""
-        if (os.path.exists(self._geoquery_log_fn())):
-            os.remove(self._geoquery_log_fn())
+        if (os.path.exists(self._geoquery_log_fn)):
+            os.remove(self._geoquery_log_fn)
 
     def total_ocr_confidence(self):
         """returns (total confidence, number of words) for getting an average over multiple runs"""
@@ -644,7 +646,7 @@ class DummyTextRecorder(RegistryProcessor):
 
         self.registry_txt = ""
 
-    def _process_contour(self, contour_txt):
+    def _process_contour(self, contour_txt, countor_font_attrs):
         self.registry_txt += "\n" + contour_txt
 
         return None

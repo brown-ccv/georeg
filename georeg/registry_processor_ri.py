@@ -79,7 +79,6 @@ class RegistryRecorder(RegistryProcessorNew):
         self.registry_txt = ""
 
     def _process_contour(self, contour_txt, contour_font_attrs):
-        """works for registries from 1975-onward"""
 
         registry_match = self.registry_pattern.match(contour_txt)
         sic_match = self.sic_pattern.match(contour_txt)

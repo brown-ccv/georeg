@@ -192,7 +192,6 @@ class RegistryProcessor1960(RegistryProcessorOldTX):
 
         return business
 
-
 class RegistryProcessor1965(RegistryProcessorOldTX):
     """1965 and 1970 TX registry parser."""
 
