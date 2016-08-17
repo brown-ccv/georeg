@@ -70,8 +70,23 @@ elif args.state == 'TX':
 else:
     raise ValueError("%s is not a supported state" % (args.state))
 
-if args.text_dump_mode:
-    from georeg.registry_processor import DummyTextRecorder as RegistryProcessor
+# needs to be declared here so that it will inherit from RegistryProcessor of our choice
+class DummyTextRecorder(RegistryProcessor):
+    """used to record all contour text"""
+
+    def __init__(self):
+        super(DummyTextRecorder, self).__init__()
+
+        self.registry_txt = ""
+
+    def _process_contour(self, contour_txt, countor_font_attrs):
+        self.registry_txt += "\n" + contour_txt
+
+        return None
+
+    def record_to_tsv(self, path, mode='w'):
+        with open(path, mode) as file:
+            file.write(self.registry_txt)
 
 def subprocess_f(images, outname, reg_processor, exc_bucket, file_mutex, print_mutex):
     try:
@@ -99,7 +114,10 @@ def subprocess_f(images, outname, reg_processor, exc_bucket, file_mutex, print_m
     return (reg_processor.mean_ocr_confidence(), reg_processor.geocoder_success_rate(), reg_processor.businesses_per_image_std())
 
 if __name__ == "__main__":
-    reg_processor = RegistryProcessor()
+    if not args.text_dump_mode:
+        reg_processor = RegistryProcessor()
+    else:
+        reg_processor = DummyTextRecorder()
     reg_processor.initialize_state_year(args.state, args.year)
 
     reg_processor.draw_debug_images = args.debug

@@ -638,19 +638,3 @@ class RegistryProcessor(object):
             sorted_column_contours.append(sorted(column,key=attrgetter('y')))
 
         return sorted_column_contours, non_column_contours
-
-
-class DummyTextRecorder(RegistryProcessor):
-    def __init__(self):
-        super(DummyTextRecorder, self).__init__()
-
-        self.registry_txt = ""
-
-    def _process_contour(self, contour_txt, countor_font_attrs):
-        self.registry_txt += "\n" + contour_txt
-
-        return None
-
-    def record_to_tsv(self, path, mode = 'w'):
-        with open(path, mode) as file:
-            file.write(self.registry_txt)
