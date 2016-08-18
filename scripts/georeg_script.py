@@ -7,6 +7,7 @@ import traceback
 import fnmatch
 import time
 import multiprocessing
+from datetime import datetime
 
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
@@ -70,7 +71,7 @@ elif args.state == 'TX':
 else:
     raise ValueError("%s is not a supported state" % (args.state))
 
-# needs to be declared here so that it will inherit from RegistryProcessor of our choice
+# needs to be declared here so that it will inherit from the RegistryProcessor we are using
 class DummyTextRecorder(RegistryProcessor):
     """used to record all contour text"""
 
@@ -89,26 +90,26 @@ class DummyTextRecorder(RegistryProcessor):
             file.write(self.registry_txt)
 
 def subprocess_f(images, outname, reg_processor, exc_bucket, file_mutex, print_mutex):
-    try:
-        reg_processor.make_tess_api()
 
-        for n, image in enumerate(images):
-            print_mutex.acquire()
-            print "processing: %s (%d/%d)" % (image, n + 1, len(images))
-            print_mutex.release()
+    reg_processor.make_tess_api()
+
+    for n, image in enumerate(images):
+        try:
+            with print_mutex:
+                print "processing: %s (%d/%d)" % (image, n + 1, len(images))
 
             reg_processor.process_image(image)
 
             # access to file must be syncronized
-            file_mutex.acquire()
-            reg_processor.record_to_tsv(outname, 'a')
-            file_mutex.release()
-    except Exception:
-        exc_type, exc_value, exc_trace = sys.exc_info()
+            with file_mutex:
+                reg_processor.record_to_tsv(outname, 'a')
 
-        # convert into a string for reporting (traceback objects can't be sent across threads)
-        exc_trace = ''.join(traceback.format_tb(exc_trace))
-        exc_bucket.put((exc_type, exc_value, exc_trace))
+        except Exception:
+            exc_type, exc_value, exc_trace = sys.exc_info()
+
+            # convert into a string for reporting (traceback objects can't be sent across threads)
+            exc_trace = ''.join(traceback.format_tb(exc_trace))
+            exc_bucket.put((exc_type, exc_value, exc_trace))
 
     # return performance stats
     return (reg_processor.mean_ocr_confidence(), reg_processor.geocoder_success_rate(), reg_processor.businesses_per_image_std())
@@ -182,16 +183,12 @@ if __name__ == "__main__":
     pool.close()
     pool.join()
 
-    num_failed_processes = 0
-
     # print exception information of failed processes
     while not exc_bucket.empty():
         exc_type, exc_value, exc_trace = exc_bucket.get()
 
         print >> sys.stderr, "Exception in subprocess:", exc_type, exc_value
         print >> sys.stderr, "Trace back:\n", exc_trace
-
-        num_failed_processes += 1
 
     # get performance stats from each subprocess
     ocr_conf_scores = []
@@ -212,6 +209,22 @@ if __name__ == "__main__":
     mean_geo_sucess_rate = sum(geo_success_rates) / len(geo_success_rates) * 1.0 if len(geo_success_rates) > 0 else -1
     mean_bus_count_std = sum(bus_count_stds) / len(bus_count_stds) * 1.0 if len(bus_count_stds) > 0 else -1
 
+    elapsed_time = time.time() - start_time
+
+    # make performance_stats log entry
+    time_of_finish_str = "%d/%d %d:%d" % (datetime.month, datetime.day, datetime.hour, datetime.minute)
+
+    log_entry = "=" * 50 + "\nState: %s, Year: %d, Time of finish: %s\n" + "=" * 50 + \
+                """
+                \nMean OCR confidence: %f%%\n
+                Geocoder success rate: %f%%\n
+                Businesses per image deviation: %f\n
+                Elapsed time: %d hours, %d minutes and %d seconds\n
+                """ + "=" * 50 + "\n\n"
+    log_entry = log_entry % (args.state, args.year, time_of_finish_str,
+                             mean_ocr_conf, mean_geo_sucess_rate, mean_bus_count_std,
+                             elapsed_time / 60 ** 2, (elapsed_time % 60 ** 2) / 60, (elapsed_time % 60 ** 2) % 60)
+
     write_mode = "a"
 
     if not os.path.exists(os.path.join(args.outdir, "performance_stats.txt")):
@@ -219,19 +232,11 @@ if __name__ == "__main__":
 
     # record performance stats
     with open(os.path.join(args.outdir, "performance_stats.txt"), write_mode) as conf_file:
-        conf_file.write("state: %s\n"
-                        "year: %d\n"
-                        "ocr confidence: %f%%\n"
-                        "geocoder success rate: %f%%\n"
-                        "businesses per image deviation: %f\n\n"
-                        % (args.state,args.year, mean_ocr_conf, mean_geo_sucess_rate, mean_bus_count_std))
-
-    elapsed_time = time.time() - start_time
+        conf_file.write(log_entry)
 
     print "Mean OCR confidence: %f%%" % mean_ocr_conf
     print "Geocoder success rate: %f%%" % mean_geo_sucess_rate
     print "Businesses per image deviation: %f" % mean_bus_count_std
-    print "Number of failed processes: %d" % num_failed_processes
     print "Elapsed time: %d hours, %d minutes and %d seconds" % (elapsed_time / 60 ** 2, (elapsed_time % 60 ** 2) / 60, (elapsed_time % 60 ** 2) % 60)
 
     print "done"

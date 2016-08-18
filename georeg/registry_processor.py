@@ -96,17 +96,13 @@ class RegistryProcessorException(Exception):
 cv2_io_mutex = Lock()
 
 def cv2_imread_safe(*args, **kwargs):
-    cv2_io_mutex.acquire()
-    result = cv2.imread(*args, **kwargs)
-    cv2_io_mutex.release()
-
+    with cv2_io_mutex:
+        result = cv2.imread(*args, **kwargs)
     return result
 
 def cv2_imwrite_safe(*args, **kwargs):
-    cv2_io_mutex.acquire()
-    result = cv2.imwrite(*args, **kwargs)
-    cv2_io_mutex.release()
-
+    with cv2_io_mutex:
+        result = cv2.imwrite(*args, **kwargs)
     return result
 
 class RegistryProcessor(object):
