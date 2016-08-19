@@ -89,9 +89,14 @@ class DummyTextRecorder(RegistryProcessor):
         with open(path, mode) as file:
             file.write(self.registry_txt)
 
-def subprocess_f(images, outname, reg_processor, exc_bucket, file_mutex, print_mutex):
+def subprocess_f(images, outname, reg_processor, exc_bucket, tsv_file_mutex, print_mutex):
 
-    reg_processor.make_tess_api()
+    try:
+        reg_processor.make_tess_api()
+    except Exception:
+        with print_mutex:
+            print >>sys.stderr, "exception when initializing tesseract api"
+        raise
 
     for n, image in enumerate(images):
         try:
@@ -101,7 +106,7 @@ def subprocess_f(images, outname, reg_processor, exc_bucket, file_mutex, print_m
             reg_processor.process_image(image)
 
             # access to file must be syncronized
-            with file_mutex:
+            with tsv_file_mutex:
                 reg_processor.record_to_tsv(outname, 'a')
 
         except Exception:
@@ -133,12 +138,6 @@ if __name__ == "__main__":
     else:
         outname = "%s/%d-compiled.tsv" % (args.outdir, args.year)
 
-    # make some variables to be shared with subprocesses
-    manager = multiprocessing.Manager()
-    exc_bucket = manager.Queue()
-    tsv_file_mutex = manager.Lock()
-    print_mutex = manager.Lock()
-
     # truncate file if we aren't suppose to append
     if not args.append:
         f = open(outname, 'w')
@@ -161,6 +160,12 @@ if __name__ == "__main__":
 
     if args.debug: # if we are looking at debug images we don't want them being written to by 4 processes at once
         num_processes = 1
+
+    # make some variables to be shared with subprocesses
+    manager = multiprocessing.Manager()
+    exc_bucket = manager.Queue()
+    tsv_file_mutex = manager.Lock()
+    print_mutex = manager.Lock()
 
     # intialize some threading variables
     images_per_process = len(image_list) / num_processes
@@ -211,9 +216,10 @@ if __name__ == "__main__":
 
     elapsed_time = time.time() - start_time
 
-    # make performance_stats log entry
-    time_of_finish_str = "%d/%d %d:%d" % (datetime.month, datetime.day, datetime.hour, datetime.minute)
+    right_now = datetime.today()
+    time_of_finish_str = "%d/%d %d:%d" % (right_now.month, right_now.day, right_now.hour, right_now.minute)
 
+    # make performance_stats log entry
     log_entry = "=" * 50 + "\nState: %s, Year: %d, Time of finish: %s\n" + "=" * 50 + \
                 """
                 \nMean OCR confidence: %f%%\n

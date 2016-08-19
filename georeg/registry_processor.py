@@ -7,41 +7,38 @@ import sys
 import ConfigParser
 import itertools
 import collections
+import spell_checker
 import business_geocoder as geo
 from math import sqrt
-from fuzzywuzzy import fuzz, process
 from operator import itemgetter, attrgetter
 from sklearn.cluster import KMeans
-from threading import Lock
 
 import georeg
 from TessBinding import TessBaseAPI
 
 _datadir = os.path.join(georeg.__path__[0], "data")
 
-class CityDetector:
+class CityDetector(spell_checker.SpellChecker):
     """loads a file of cities for comparison against strings"""
-    def __init__(self):
-        self.city_list = []
+    def __init__(self, similarity_thresh = 50):
+        super(CityDetector, self).__init__(similarity_thresh)
         
-    def load_cities(self, file_name):
-        self.city_list = [] # clear old values
-
+    def load_cities_txt_file(self, file_name):
         with open(file_name) as file:
             for line in file:
                 line = line.strip()
-                self.city_list.append(line)
+                self.add_token(line, 1)
 
     def match_to_cities(self, line, cutoff=60):
         line = line.lower().strip()
 
         # if the end of the string matches "—continued" then remove it
-        if fuzz.ratio(line[-12:], "-continued") > cutoff:
+        if spell_checker.ratio(line[-12:], "-continued") > cutoff:
             line = line[:-12]
 
-        match, ratio = process.extractOne(line, self.city_list)
+        match, ratio = self.get_best_spelling_correction(line)
 
-        if ratio > cutoff:
+        if ratio >= cutoff:
             return match
         else:
             return None
@@ -91,19 +88,11 @@ class RegistryProcessorException(Exception):
     def __str__(self):
         return self.value
 
-# thread safe versions of opencv's imread and imwrite
-
-cv2_io_mutex = Lock()
-
 def cv2_imread_safe(*args, **kwargs):
-    with cv2_io_mutex:
-        result = cv2.imread(*args, **kwargs)
-    return result
+    return cv2.imread(*args, **kwargs)
 
 def cv2_imwrite_safe(*args, **kwargs):
-    with cv2_io_mutex:
-        result = cv2.imwrite(*args, **kwargs)
-    return result
+    return cv2.imwrite(*args, **kwargs)
 
 class RegistryProcessor(object):
 
@@ -191,7 +180,7 @@ class RegistryProcessor(object):
         self.state = state
         self._city_lists_path = os.path.join(_datadir, "%s-cities.txt" % self.state)
         self._city_detector = CityDetector()
-        self._city_detector.load_cities(self._city_lists_path)
+        self._city_detector.load_cities_txt_file(self._city_lists_path)
 
         self.year = year
 
@@ -238,25 +227,27 @@ class RegistryProcessor(object):
 
         noncolumn_contours = self._get_noncolumn_contours_of_interest(noncolumn_contours)
 
-        contoured = None
-
         if self.draw_debug_images:
             contoured = self._image.copy()
+        else: contoured = None
 
         # set the image tesseract will work with
         self._tess_api.SetImage(self._thresh)
+
+        if self.draw_debug_images:
+            draw_rect = lambda contoured, x, y, w, h: cv2.rectangle(contoured, (x, y), (x + w, y + h), self.line_color, 5)
+        else:
+            draw_rect = lambda contoured, x, y, w, h: None
 
         # OCR our column contours
         for contour in itertools.chain.from_iterable(column_contours):
             x,y,w,h = self._expand_bb(contour.x,contour.y,contour.w,contour.h)
 
-            if self.draw_debug_images:
-                # draw bounding box on original image
-                cv2.rectangle(contoured,(x,y),(x+w,y+h),self.line_color,5)
+            draw_rect(contoured, x, y, w, h)
 
             # specify region tesseract should ocr
             self._tess_api.SetRectangle(x,y,w,h)
-            contour.text, contour.text_attrs = self._tess_api.GetTextWithAttrs()
+            contour.text, contour.font_attrs = self._tess_api.GetTextWithAttrs()
 
             total_conf, num_words = self._tess_api.TotalConfidence()
 
@@ -267,13 +258,12 @@ class RegistryProcessor(object):
         for contour in noncolumn_contours:
             x, y, w, h = self._expand_bb(contour.x, contour.y, contour.w, contour.h)
 
-            if self.draw_debug_images:
-                # draw bounding box on original image
-                cv2.rectangle(contoured, (x, y), (x + w, y + h), self.line_color, 5)
+            draw_rect(contoured, x, y, w, h)
 
             # specify region tesseract should ocr
             self._tess_api.SetRectangle(x, y, w, h)
-            contour.text, contour.text_attrs = self._tess_api.GetTextWithAttrs()
+
+            contour.text, contour.font_attrs = self._tess_api.GetTextWithAttrs()
 
         if self.draw_debug_images:
             # write original image with added contours to disk
@@ -288,21 +278,20 @@ class RegistryProcessor(object):
             file = open(self._geoquery_log_fn, "w")
             file.close()
 
+        # if args is indeed multiple arguments then we'll expand them
+        if isinstance(call_args[0], collections.Sequence) and not isinstance(call_args[0], basestring):
+            def process_with_args(args):
+                return self._process_contour(*args), args[0]
+        else:  # otherwise we treat it like one argument
+            def process_with_args(args):
+                return self._process_contour(args), args
+
         # here we process all of our contours
         for args in call_args:
-            # if args is indeed multiple arguments then we'll expand them
-            if isinstance(args, collections.Sequence) and not isinstance(args, basestring):
-                business = self._process_contour(*args)
-                contour_txt = args[0]
-            else: # otherwise we treat it like one argument
-                business = self._process_contour(args)
-                contour_txt = args
+            business, contour_txt = process_with_args(args)
 
             if business is None:
                 continue
-
-            # record business
-            self.businesses.append(business)
 
             # if address was found attempt to geocode
             if business.address:
@@ -323,6 +312,9 @@ class RegistryProcessor(object):
                 else:
                     self.num_geo_successes += 1
 
+            # record business
+            self.businesses.append(business)
+
         # record the number of businesses found in this image
         self.per_image_business_counts.append(num_businesses_found)
 
@@ -342,7 +334,7 @@ class RegistryProcessor(object):
         :return: a list of argument tuples that will each be passed to a _process_contour() call
                 (1st arg must be the contour text, and 2nd must be the contour text attributes)
         """
-        return ((c.text, c.text_attrs) for c in itertools.chain.from_iterable(column_contours))
+        return ((c.text, c.font_attrs) for c in itertools.chain.from_iterable(column_contours))
 
     def _process_contour(self, contour_txt, countor_font_attrs, *args):
         """
