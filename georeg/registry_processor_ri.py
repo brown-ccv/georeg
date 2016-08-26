@@ -34,7 +34,7 @@ class RegistryProcessorNew(reg.RegistryProcessor):
             return business
         elif sic_match:
             self.current_sic = sic_match.group(0)
-        return None
+        return reg.Business()
 
 
     def _parse_registry_block(self, registry_txt):
@@ -87,7 +87,7 @@ class RegistryRecorder(RegistryProcessorNew):
             lines = contour_txt.split("\n")
 
             if len(lines) < 2:
-                return None
+                return reg.Business()
 
             lines[0] = self._start(self.name_prefix) + " " + lines[0] + " " + self._end(self.name_prefix)
             lines[1] = self._start(self.address_prefix) + " " + lines[1] + " " + self._end(self.address_prefix)
@@ -96,7 +96,7 @@ class RegistryRecorder(RegistryProcessorNew):
             self.registry_txt += " ".join(lines)
             self.registry_txt += "\n" + self._end(self.bus_prefix) + "\n"
 
-        return None
+        return reg.Business()
     def record_to_tsv(self, path, mode='w'):
         with open(path, mode) as file:
             file.write(self.registry_txt)
@@ -140,7 +140,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             if match_city:
                 self.current_city = match_city
                 self.current_zip = zip
-        return None
+        return reg.Business()
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1953-1975"""
@@ -186,7 +186,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
                                     key=attrgetter('y'))
 
         if self.draw_debug_images:
-            canvas = self._thresh.copy()
+            canvas = self.__thresh_image.copy()
             for c in header_contours:
                 cv2.circle(canvas, (c.x_mid, c.y_mid), 20, self.line_color, 35)
             reg.cv2_imwrite_safe("headers.tiff", canvas)

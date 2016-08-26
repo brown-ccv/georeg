@@ -4,8 +4,10 @@ import csv
 import os
 from Levenshtein import distance
 
+import exceptions
+
 # takes in text then returns tokens as a list of strings (without occurences!)
-def my_tokenizer(text, min_len=2, allow_number_tokens=False):
+def tokenize(text, min_len=2, allow_number_tokens=False):
 
     # remove as much punctuation as can be safely done
     # (note: $ and @ are left out because they can be confused with letters by the OCR)
@@ -29,7 +31,11 @@ def ratio(str1, str2):
     :return: similarity ratio as a percent
     """
     #return (1.0 - distance(str1, str2) * 1.0 / (len(str1) + len(str2))) * 100.0
-    return (1.0 - distance(str1, str2) * 1.0 / max(len(str1), len(str2))) * 100.0
+    try:
+        return (1.0 - distance(str1, str2) * 1.0 / max(len(str1), len(str2))) * 100.0
+    except exceptions.TypeError:
+        print type(str1), type(str2)
+        raise
 
 class Token(object): # a "word" in our spellcheck dictionary
     def __init__(self, value = "", count = 0):
@@ -101,7 +107,7 @@ class SpellChecker(object):
 
             # replace string values with actual token objects
             for token in self._tokens.itervalues():
-                token._similar_tokens = set([self._tokens[t] for t in token.similar_tokens])
+                token.similar_tokens = set([self._tokens[t] for t in token.similar_tokens])
 
         except (IndexError, KeyError):
             e = RuntimeError("dictionary file \"%s\" seems to be corrupt" % file_name)
@@ -181,7 +187,7 @@ class SpellChecker(object):
 
         return best_token_str, best_score
 
-    def change_similarity_threshhold(self, new_sim_thresh):
+    def change_similarity_threshold(self, new_sim_thresh):
         """rebuilds the dictionary with the new similarity threshold"""
 
         # update our similar tokens lists
@@ -191,12 +197,18 @@ class SpellChecker(object):
                     if self.__similarity_thresh > ratio(token1.value, token2.value) >= new_sim_thresh:
                         token1.similar_tokens.add(token2)
                         token2.similar_tokens.add(token1)
-        else:
+        elif new_sim_thresh > self.__similarity_thresh:
             for token in self._tokens.itervalues():
+                # new similar token list for 'token' (the list can't be change while we iterate through it)
+                new_sim_set = set([])
+
                 for sim_token in token.similar_tokens:
-                    if ratio(token.value, sim_token.value) < new_sim_thresh:
-                        token.similar_tokens.remove(sim_token)
-                        sim_token.similar_tokens.remove(token)
+                    # see if the similar tokens still pass the threshold
+                    if ratio(token.value, sim_token.value) >= new_sim_thresh: # if they do add them to the new list
+                        new_sim_set.add(sim_token)
+                    else:
+                        sim_token.similar_tokens.discard(token) # if they don't remove this token from the other token's similar token list
+                token.similar_tokens = new_sim_set
 
         self.__similarity_thresh = new_sim_thresh
 
@@ -205,12 +217,12 @@ class SpellChecker(object):
         self._total_occurrences = 0
         self.__next_touch_id = 0
 
-    def add_common_tokens_from_txt_file(self, fn, num=500, start=0):
+    def add_common_tokens_from_txt_file(self, fn, num=1000, start=0):
         with open(fn,"r") as file:
             txt = file.read()
             self.add_common_tokens_from_txt(txt, num, start)
 
-    def add_common_tokens_from_txt(self, text, num=500, start=0):
+    def add_common_tokens_from_txt(self, text, num=1000, start=0):
         """
         finds most common tokens in provided text and adds them to dictionary
         :param text: text to get tokens from
@@ -219,7 +231,7 @@ class SpellChecker(object):
                       (i.e. 10 would mean ignore the ten most common tokens)
         :return:
         """
-        tokens = my_tokenizer(text)
+        tokens = tokenize(text)
 
         freq_dist = nltk.FreqDist(tokens)
         tokens = freq_dist.most_common(num + start)
@@ -289,10 +301,10 @@ class SpellChecker(object):
 
         return best_token, best_similarity_score
 
-# spell_checker = SpellChecker(similarity_thresh=60)
-
-#spell_checker.load_dictionary_from_tsv("texas_vocab")
-
+# spell_checker = SpellChecker(similarity_thresh=50)
+#
+# # spell_checker.load_dictionary_from_tsv("texas_vocab")
+#
 # txt_corpi = []
 #
 # for item in os.listdir("./Texas dumps"):
@@ -302,16 +314,10 @@ class SpellChecker(object):
 # txt_corpi = "\n".join(txt_corpi)
 #
 # spell_checker.add_common_tokens_from_txt(txt_corpi, 3000)
+# spell_checker.write_dictionary_to_tsv("texas_vocab_50.tsv")
+#
+# spell_checker.change_similarity_threshhold(new_sim_thresh=55)
+# spell_checker.write_dictionary_to_tsv("texas_vocab_55.tsv")
+#
+# spell_checker.change_similarity_threshhold(new_sim_thresh=60)
 # spell_checker.write_dictionary_to_tsv("texas_vocab_60.tsv")
-
-# spell_checker.remove_all_tokens(new_sim_thresh=60)
-# spell_checker.add_common_tokens_from_txt(txt_corpi, 3000)
-# spell_checker.write_dictionary_to_tsv("texas_vocab_60")
-#
-# spell_checker.remove_all_tokens(new_sim_thresh=65)
-# spell_checker.add_common_tokens_from_txt(txt_corpi, 3000)
-# spell_checker.write_dictionary_to_tsv("texas_vocab_65")
-#
-# spell_checker.remove_all_tokens(new_sim_thresh=70)
-# spell_checker.add_common_tokens_from_txt(txt_corpi, 3000)
-# spell_checker.write_dictionary_to_tsv("texas_vocab_70")

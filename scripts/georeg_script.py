@@ -83,7 +83,7 @@ class DummyTextRecorder(RegistryProcessor):
     def _process_contour(self, contour_txt, countor_font_attrs):
         self.registry_txt += "\n" + contour_txt
 
-        return None
+        return reg_processor.Business()
 
     def record_to_tsv(self, path, mode='w'):
         with open(path, mode) as file:
@@ -93,10 +93,18 @@ def subprocess_f(images, outname, reg_processor, exc_bucket, tsv_file_mutex, pri
 
     try:
         reg_processor.make_tess_api()
-    except Exception:
+        reg_processor.initialize_spell_checkers()
+    except Exception: # these will be fatal exceptions
         with print_mutex:
-            print >>sys.stderr, "exception when initializing tesseract api"
+            print >> sys.stderr, "exception when initializing spellchecker & tesseract api"
+        exc_type, exc_value, exc_trace = sys.exc_info()
+
+        # convert into a string for reporting (traceback objects can't be sent across threads)
+        exc_trace = ''.join(traceback.format_tb(exc_trace))
+        exc_bucket.put((exc_type, exc_value, exc_trace))
         raise
+
+    num_exceptions = 0
 
     for n, image in enumerate(images):
         try:
@@ -116,15 +124,23 @@ def subprocess_f(images, outname, reg_processor, exc_bucket, tsv_file_mutex, pri
             exc_trace = ''.join(traceback.format_tb(exc_trace))
             exc_bucket.put((exc_type, exc_value, exc_trace))
 
+            num_exceptions += 1
+
+            if num_exceptions >= 5:
+                break
+
+
+    bus_std, bus_avg = reg_processor.business_count_std_and_avg()
+
     # return performance stats
-    return (reg_processor.mean_ocr_confidence(), reg_processor.geocoder_success_rate(), reg_processor.businesses_per_image_std())
+    return (reg_processor.mean_ocr_confidence(), reg_processor.geocoder_success_rate(), bus_std, bus_avg)
 
 if __name__ == "__main__":
     if not args.text_dump_mode:
         reg_processor = RegistryProcessor()
     else:
         reg_processor = DummyTextRecorder()
-    reg_processor.initialize_state_year(args.state, args.year)
+    reg_processor.initialize_state_year(args.state, args.year, init_city_detector=False, init_spellchecker=False)
 
     reg_processor.draw_debug_images = args.debug
     reg_processor.assume_pre_processed = args.pre_processed
@@ -169,6 +185,7 @@ if __name__ == "__main__":
 
     # intialize some threading variables
     images_per_process = len(image_list) / num_processes
+    extra_images = len(image_list) % num_processes
     pool = multiprocessing.Pool(processes=num_processes)
     results = []
 
@@ -178,10 +195,14 @@ if __name__ == "__main__":
     for i in xrange(num_processes):
         assigned_images = []
 
-        if i == num_processes - 1:
-            assigned_images = image_list[i * images_per_process:]
+        if extra_images > 0:
+            assigned_images = image_list[i * (images_per_process + 1):(i + 1) * (images_per_process + 1)]
+            extra_images -= 1
+        elif extra_images == 0:
+            assigned_images = image_list[i * (images_per_process + 1):(i + 1) * (images_per_process)]
+            extra_images -= 1
         else:
-            assigned_images = image_list[i * images_per_process:(i + 1) * images_per_process]
+            assigned_images = image_list[i * (images_per_process):(i + 1) * (images_per_process)]
 
         results.append(pool.apply_async(subprocess_f, (assigned_images, outname, reg_processor, exc_bucket, tsv_file_mutex, print_mutex)))
 
@@ -199,8 +220,9 @@ if __name__ == "__main__":
     ocr_conf_scores = []
     geo_success_rates = []
     bus_count_stds = []
+    bus_count_means = []
     for result in results:
-        ocr_conf_score, geo_success_rate, bus_count_std = result.get()
+        ocr_conf_score, geo_success_rate, bus_count_std, bus_count_mean = result.get()
 
         if ocr_conf_score != -1:
             ocr_conf_scores.append(ocr_conf_score)
@@ -208,27 +230,28 @@ if __name__ == "__main__":
             geo_success_rates.append(geo_success_rate)
         if bus_count_std != -1:
             bus_count_stds.append(bus_count_std)
+            bus_count_means.append(bus_count_mean)
 
     # get mean of each score
     mean_ocr_conf = sum(ocr_conf_scores) / len(ocr_conf_scores) * 1.0 if len(ocr_conf_scores) > 0 else -1
     mean_geo_sucess_rate = sum(geo_success_rates) / len(geo_success_rates) * 1.0 if len(geo_success_rates) > 0 else -1
     mean_bus_count_std = sum(bus_count_stds) / len(bus_count_stds) * 1.0 if len(bus_count_stds) > 0 else -1
+    mean_bus_count = sum(bus_count_means) / len(bus_count_means) * 1.0 if len(bus_count_means) > 0 else -1
 
     elapsed_time = time.time() - start_time
 
     right_now = datetime.today()
-    time_of_finish_str = "%d/%d %d:%d" % (right_now.month, right_now.day, right_now.hour, right_now.minute)
+    time_of_finish_str = "%d/%d/%d %d:%d" % (right_now.month, right_now.day, right_now.year - 2000, right_now.hour, right_now.minute)
 
     # make performance_stats log entry
     log_entry = "=" * 50 + "\nState: %s, Year: %d, Time of finish: %s\n" + "=" * 50 + \
-                """
-                \nMean OCR confidence: %f%%\n
-                Geocoder success rate: %f%%\n
-                Businesses per image deviation: %f\n
-                Elapsed time: %d hours, %d minutes and %d seconds\n
-                """ + "=" * 50 + "\n\n"
+                "\nMean OCR confidence: %f%%\n" + \
+                "Geocoder success rate: %f%%\n" + \
+                "Businesses per image deviation: %f\n" + \
+                "Businesses per image mean: %f\n" + \
+                "Elapsed time: %d hours, %d minutes and %d seconds\n" + "=" * 50 + "\n\n"
     log_entry = log_entry % (args.state, args.year, time_of_finish_str,
-                             mean_ocr_conf, mean_geo_sucess_rate, mean_bus_count_std,
+                             mean_ocr_conf, mean_geo_sucess_rate, mean_bus_count_std, mean_bus_count,
                              elapsed_time / 60 ** 2, (elapsed_time % 60 ** 2) / 60, (elapsed_time % 60 ** 2) % 60)
 
     write_mode = "a"
@@ -243,6 +266,7 @@ if __name__ == "__main__":
     print "Mean OCR confidence: %f%%" % mean_ocr_conf
     print "Geocoder success rate: %f%%" % mean_geo_sucess_rate
     print "Businesses per image deviation: %f" % mean_bus_count_std
+    print "Businesses per image mean: %f" % mean_bus_count
     print "Elapsed time: %d hours, %d minutes and %d seconds" % (elapsed_time / 60 ** 2, (elapsed_time % 60 ** 2) / 60, (elapsed_time % 60 ** 2) % 60)
 
     print "done"

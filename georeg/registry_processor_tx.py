@@ -38,7 +38,7 @@ class RegistryProcessorTX(reg.RegistryProcessor):
         elif city_match:
             self.current_city = city_match.group(1)
 
-        return None
+        return reg.Business()
 
 
 class RegistryProcessorOldTX(RegistryProcessorTX):
@@ -48,8 +48,7 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
         """Extract contours from the image, then split contours based on 
         hanging indents."""
 
-        image, contours, hierarchy = super(RegistryProcessorOldTX,
-                                           self)._get_contours(*args, **kwargs)
+        contours= super(RegistryProcessorOldTX, self)._get_contours(*args, **kwargs)
         split_contours = []
 
         for c in contours:
@@ -87,7 +86,7 @@ class RegistryProcessorOldTX(RegistryProcessorTX):
                         # Set y as top of next block.
                         y_top = y
 
-        return image, split_contours, hierarchy
+        return split_contours
 
 class RegistryProcessor1950s(RegistryProcessorOldTX):
     """1950s TX registry parser."""
