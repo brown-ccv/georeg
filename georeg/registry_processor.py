@@ -118,6 +118,7 @@ class RegistryProcessor(object):
         if not self._tess_api.SetVariable("tessedit_char_whitelist", "\"#%&'()*+,-./\\0123456789:;ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz"):
             raise RuntimeError("error setting tesseract character whitelist")
 
+        # uncomment this to register the generalized spellchecker with the tesseract api
         #self._tess_api.RegisterSpellCheckCallback(lambda str, conf: RegistryProcessor._spellcheck_callback(self, str, conf))
 
     def initialize_spell_checkers(self):

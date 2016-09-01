@@ -93,10 +93,12 @@ def subprocess_f(images, outname, reg_processor, exc_bucket, tsv_file_mutex, pri
 
     try:
         reg_processor.make_tess_api()
-        reg_processor.initialize_spell_checkers()
+
+        # right now we aren't using the generalized spell checker because it decreases accuracy, the vocab needs to be cleaned before use
+        #reg_processor.initialize_spell_checkers()
     except Exception: # these will be fatal exceptions
         with print_mutex:
-            print >> sys.stderr, "exception when initializing spellchecker & tesseract api"
+            print >> sys.stderr, "exception when initializing spellchecker and/or tesseract api"
         exc_type, exc_value, exc_trace = sys.exc_info()
 
         # convert into a string for reporting (traceback objects can't be sent across threads)
@@ -140,7 +142,7 @@ if __name__ == "__main__":
         reg_processor = RegistryProcessor()
     else:
         reg_processor = DummyTextRecorder()
-    reg_processor.initialize_state_year(args.state, args.year, init_city_detector=False, init_spellchecker=False)
+    reg_processor.initialize_state_year(args.state, args.year, init_city_detector=True, init_spellchecker=False)
 
     reg_processor.draw_debug_images = args.debug
     reg_processor.assume_pre_processed = args.pre_processed
