@@ -158,9 +158,8 @@ class RegistryProcessor(object):
         # image processing parameters (these are example values)
         self.kernel_shape = (10, 3) # wider (i.e. higher x value) will cause more collisions along the x axis and visa versa for the y value
         self.thresh_value = 60  # higher = more exposure (max = 255)
-        self.close_iterations = 8 # iterations of closing operation, higher values will help fill contours where text is farther apart but can cause contour collisions
-        self.open_iterations = 3 # iterations of opening operation, higher values will help remove noise but can cause malformed contours
-        self.indent_width = 0.025  # indent width as % of contour width used for separating texas contours
+        self.iterations = 8 # iterations of closing operation, higher values will help fill contours where text is farther apart but can cause contour collisions
+        self.indent_width = 0.025 # indent width as % of contour width used for separating texas contours
 
         # percent of image width and height to add to bounding box width and height of contours (can improve ocr accuracy)
         # values that are too high will cause excess text to be ocred with each contour
@@ -213,7 +212,7 @@ class RegistryProcessor(object):
 
         self.__image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
-        contours = self._get_contours(self.kernel_shape, self.close_iterations, self.open_iterations, make_new_thresh = True)
+        contours = self._get_contours(make_new_thresh = True)
         contours = [Contour(c) for c in contours]
 
         #remove noise from edge of image
@@ -445,8 +444,7 @@ class RegistryProcessor(object):
                 'kernel_shape_x': str(self.kernel_shape[0]),
                 'kernel_shape_y': str(self.kernel_shape[1]),
                 'thresh_value': str(self.thresh_value),
-                'close_iterations': str(self.close_iterations),
-                'open_iterations': str(self.open_iterations),
+                'iterations': str(self.iterations),
                 'columns_per_page': str(self.columns_per_page),
                 'pages_per_image': str(self.pages_per_image),
                 'bb_expansion_percent': str(self.bb_expansion_percent), 
@@ -458,8 +456,7 @@ class RegistryProcessor(object):
         # Get values from config file.
         self.kernel_shape = (int(cp.get('RegistryProcessor','kernel_shape_x')),int(cp.get('RegistryProcessor','kernel_shape_y')))
         self.thresh_value = cp.getint('RegistryProcessor','thresh_value')
-        self.close_iterations = cp.getint('RegistryProcessor','close_iterations')
-        self.open_iterations = cp.getint('RegistryProcessor', 'open_iterations')
+        self.iterations = cp.getint('RegistryProcessor','iterations')
         self.columns_per_page = cp.getint('RegistryProcessor','columns_per_page')
         self.pages_per_image = cp.getint('RegistryProcessor','pages_per_image')
         self.bb_expansion_percent = cp.getfloat('RegistryProcessor','bb_expansion_percent')
@@ -473,8 +470,7 @@ class RegistryProcessor(object):
         cp.set('RegistryProcessor','kernel_shape_x',str(self.kernel_shape[0]))
         cp.set('RegistryProcessor','kernel_shape_y',str(self.kernel_shape[1]))
         cp.set('RegistryProcessor','thresh_value',str(self.thresh_value))
-        cp.set('RegistryProcessor','close_iterations',str(self.close_iterations))
-        cp.set('RegistryProcessor','open_iterations',str(self.open_iterations))
+        cp.set('RegistryProcessor','iterations',str(self.iterations))
         cp.set('RegistryProcessor','columns_per_page',str(self.columns_per_page))
         cp.set('RegistryProcessor','pages_per_image',str(self.pages_per_image))
         cp.set('RegistryProcessor','bb_expansion_percent',str(self.bb_expansion_percent))
@@ -524,21 +520,15 @@ class RegistryProcessor(object):
 
         return filtered_contours
 
-    def _get_contours(self, kernel_shape, close_iter, open_iter = -1,  make_new_thresh = True):
+    def _get_contours(self, make_new_thresh = True):
         """
         Performs a close operation to close gaps between letters to make solid contours,
         then performs an open operation to remove stray noise contours and returns the result
-        :param kernel_shape: shape of kernel to use for the operation, should be chosen based on the shape of business contours
-                             (i.e. wide business contours that are stacked closely on top of one another should have a wide and short kernel)
-        :param close_iter: iterations of the close operation, higher values will make characters collide more easily
-                           but can also cause business contours to collide if too high
-        :param open_iter: iterations of the open operation, higher values will help remove noise
-                          but can result in malformed contours if too high
         :param make_new_thresh: if true this function will make a new thresh_image rather than using the existing self.__thresh_image
         :return: returns cv2 contour data (not wrapped in Contour() class)
         """
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_shape)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, self.kernel_shape)
 
         if make_new_thresh: # if asked then we make a new thresh image
             if not self.assume_pre_processed:
@@ -547,10 +537,10 @@ class RegistryProcessor(object):
                 _,self.__thresh_image = cv2.threshold(self.__image, 0, 255, cv2.THRESH_BINARY_INV) # threshold with 0 threshold value
 
         # close operation to fill contours
-        closed = cv2.morphologyEx(self.__thresh_image, cv2.MORPH_CLOSE, kernel, iterations = close_iter)
+        closed = cv2.morphologyEx(self.__thresh_image, cv2.MORPH_CLOSE, kernel, iterations = self.iterations)
 
         # perform an open operation to remove noise
-        closed = cv2.morphologyEx(closed,cv2.MORPH_OPEN,kernel,iterations = open_iter if open_iter != -1 else close_iter / 3)
+        closed = cv2.morphologyEx(closed,cv2.MORPH_OPEN,kernel,iterations = self.iterations / 3)
 
         return cv2.findContours(closed,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)[1] # actual contour data is the second element
 
