@@ -18,7 +18,7 @@ setup(
     provides=["georeg"],
     packages=["georeg"],
     package_data={"georeg": ['data/*.txt', 'configs/**/*.cfg']},
-    scripts=["scripts/georeg_script.py"],
+    scripts=["scripts/georeg"],
     install_requires=[
         "fuzzywuzzy>=0.11.1",
         "geopy>=1.11.0",
