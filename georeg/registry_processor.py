@@ -14,7 +14,7 @@ from operator import itemgetter, attrgetter
 from sklearn.cluster import KMeans
 
 import georeg
-from TessBinding import TessBaseAPI
+from tessapi import TessBaseAPI
 
 class CityDetector(spell_checker.SpellChecker):
     """loads a file of cities for comparison against strings"""
