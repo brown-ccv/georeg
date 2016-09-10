@@ -16,8 +16,14 @@ setup(
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7"],
     provides=["georeg"],
-    packages=["georeg", "brown_geopy"],
+    packages=["georeg"],
     package_data={"georeg": ['data/*.txt', 'configs/**/*.cfg']},
     scripts=["scripts/georeg_script.py"],
-    install_requires=['fuzzywuzzy', 'numpy', 'scikit-learn'],
+    install_requires=[
+        "fuzzywuzzy>=0.11.1",
+        "geopy>=1.11.0",
+        "nltk>=3.2.1",
+        "numpy>=1.11.1",
+        "scikit-learn>=0.17.1",
+        "tessapi>=0.0.1"]
 )

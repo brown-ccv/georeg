@@ -1,7 +1,7 @@
 import os
 
 import geopy
-from brown_geopy.brownarcgis import BrownArcGIS
+from brownarcgis import BrownArcGIS
 
 
 geolocator = BrownArcGIS(username = os.environ.get("BROWNGIS_USERNAME"),
