@@ -1,17 +1,22 @@
 import os
-
-import geopy
+import re
 from brownarcgis import BrownArcGIS
-
 
 geolocator = BrownArcGIS(username = os.environ.get("BROWNGIS_USERNAME"),
                          password = os.environ.get("BROWNGIS_PASSWORD"),
                          referer = os.environ.get("BROWNGIS_REFERER"))
 
-
 def geocode_business(business, state = 'RI', timeout=60):
     """geocode a business object and store the results inside it,
     return confidence score"""
+
+    # Sub "I" with "1" for numeric values.
+    business.zip = business.zip.replace("I", "1")
+    pattern = re.compile("(^|\s)([I0-9]+)(\s|$)")
+    matches = re.findall(pattern, business.address)
+    for _, match, _ in matches:
+        business.address = re.sub(match, match.replace("I", "1"),
+                                  business.address)
 
     try:
         location = geolocator.geocode(street=business.address, city=business.city,
