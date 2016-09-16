@@ -23,7 +23,8 @@ setup(
         "fuzzywuzzy>=0.11.1",
         "geopy>=1.11.0",
         "nltk>=3.2.1",
-        "numpy>=1.11.1",
+        "numpy>=1.10.0",
+        "python-Levenshtein>=0.12.0",
         "scikit-learn>=0.17.1",
         "tessapi>=0.0.1"]
 )
