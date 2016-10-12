@@ -344,7 +344,7 @@ class RegistryProcessor(object):
         """
         return [(c.text, c.font_attrs) for c in itertools.chain.from_iterable(column_contours)]
 
-    def _process_contour(self, contour_txt, countor_font_attrs, *args):
+    def _process_contour(self, contour_txt, contour_font_attrs, *args):
         """
         Process the text of a contour to make a business object,
         may also be passed info about non-column contours if
