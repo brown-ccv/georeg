@@ -437,13 +437,13 @@ class RegistryProcessor1995(RegistryProcessorTX):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{3}/.*[[\s]+\[(.*)\]]*', re.DOTALL)
+        self.phone_pattern = re.compile(r'\d{3}/\d+', re.DOTALL) #.*[[\s]+\[(.*)\]]*', re.DOTALL)
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
+        self.good_pattern_address = re.compile(r' (.*)[,.]\s+([A-Za-z][A-Za-z ]+) (\d{5})')
         self.PO_box_pattern = re.compile(r'Box[\s]+[\d]+')
-        self.good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*)(\d{5})')
-        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*(\d{5}).*\)')
+        self.good_address_PO_pattern = re.compile(r' (.*)[,.].*[,.]\s+([A-Za-z][A-Za-z ]+) (\d+)')
+        self.bad_address_pattern = re.compile(r'\(mail: .*[,.]\s+([A-Za-z][A-Za-z ]+)[,.].*(\d{5}).*\)')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
