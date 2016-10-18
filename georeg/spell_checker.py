@@ -32,7 +32,7 @@ def ratio(str1, str2):
     """
     #return (1.0 - distance(str1, str2) * 1.0 / (len(str1) + len(str2))) * 100.0
     try:
-        return (1.0 - distance(str1, str2) * 1.0 / max(len(str1), len(str2))) * 100.0
+        return (1.0 - distance(unicode(str1), unicode(str2)) * 1.0 / max(len(str1), len(str2))) * 100.0
     except exceptions.TypeError:
         print type(str1), type(str2)
         raise
