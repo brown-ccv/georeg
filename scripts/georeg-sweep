@@ -133,14 +133,14 @@ if __name__ == "__main__":
     global args
 
     basepath = georeg.__path__[0]
-    paramfile = os.path.join(basepath, "configs", args.state, "sweep.txt")
+    paramfile = os.path.join(basepath, "configs", args.state, "sweep.tsv")
 
     if not os.path.isfile(paramfile):
        raise ValueError("could not find parameters file for state '%s'" % args.state)
 
     ranges = None
     for row in csv.DictReader(open(paramfile), delimiter='\t'):
-        if row["year"] == args.year:
+        if int(row["year"]) == args.year:
             ranges = row
     if ranges is None:
         raise ValueError("no entry in parameters file for year '%d'" % args.year)
@@ -149,9 +149,14 @@ if __name__ == "__main__":
 
     for name, l in ranges.items():
         ranges[name] = ast.literal_eval(l)
+        assert isinstance(ranges[name], list), name
+    for name in args.param_names:
+        print "%s: %s" % (name, str(ranges[name]))
 
     # determine all combinations of parameters
-    params = product(*[ranges[name] for name in args.param_names])
+    params = list(product(*[ranges[name] for name in args.param_names]))
+    print params[0]
+    print params[1]
 
     # TODO: restart from an existing output file
 
