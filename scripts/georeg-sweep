@@ -7,6 +7,7 @@ import georeg
 import os
 import sys
 import time
+import traceback
 from datetime import datetime
 from itertools import izip, product
 from multiprocessing import Pool
@@ -14,7 +15,7 @@ from multiprocessing import Pool
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
 parser.add_argument(
-    "--images", "-i", required=True, help="""
+    "--images", "-i", nargs="+", required=True, help="""
         Path of images to process (not a list, use unix file matching).""")
 parser.add_argument(
     "--state", "-s", default="", required=True, help="""
@@ -33,6 +34,9 @@ parser.add_argument(
 parser.add_argument(
     "--pre-processed", action="store_true", help="""
         Assume images have been preprocessed by scan-tailor.""")
+parser.add_argument(
+    "--threads", "-t", type=int, default=4, help="""
+        Number of threads to use.""")
 
 args = parser.parse_args()
 
@@ -69,11 +73,12 @@ else:
 
 def run_params(params):
     global args
+    print args
 
     start_time = time.time()
 
     basedir = os.path.dirname(args.output)
-    outdir = os.path.join(basedir, *params)
+    outdir = os.path.join(basedir, *map(str, params))
 
     if not os.path.isdir(outdir): os.makedirs(outdir)
 
@@ -97,7 +102,10 @@ def run_params(params):
     business_count_std = 0
 
     for image in args.images:
-        reg_processor.process_image(image)
+        try:
+            reg_processor.process_image(image)
+        except:
+            raise Exception("".join(traceback.format_exception(*sys.exc_info())))
         reg_processor.record_to_tsv(outname, 'a')
         ocr_confidence += reg_processor.mean_ocr_confidence()
         geocoder_success += reg_processor.geocoder_success_rate()
@@ -105,7 +113,7 @@ def run_params(params):
         business_count += avg
         business_count_std += std
 
-    norm = 1.0 / len(args.image)
+    norm = 1.0 / len(args.images)
     ocr_confidence *= norm
     geocoder_success *= norm
     business_count *= norm
@@ -114,7 +122,7 @@ def run_params(params):
     values = [
         start_time,
         time.time() - start_time,
-        ','.join(params),
+        ','.join(map(str, params)),
         ocr_confidence,
         geocoder_success,
         business_count,
@@ -142,6 +150,7 @@ if __name__ == "__main__":
     for row in csv.DictReader(open(paramfile), delimiter='\t'):
         if int(row["year"]) == args.year:
             ranges = row
+            break
     if ranges is None:
         raise ValueError("no entry in parameters file for year '%d'" % args.year)
     ranges.pop("year")
@@ -155,12 +164,15 @@ if __name__ == "__main__":
 
     # determine all combinations of parameters
     params = list(product(*[ranges[name] for name in args.param_names]))
-    print params[0]
-    print params[1]
 
     # TODO: restart from an existing output file
 
-    pool = Pool(initializer=set_args, initargs=[args])
+    if args.debug:
+        args.threads = 1
+
+    pool = Pool(args.threads, initializer=set_args, initargs=[args])
+
     with open(args.output, "w") as out:
+        print >>out, "start,elapsed,%s,ocr_confidence,geocoder_success,business_count,business_count_std" % ",".join(args.param_names)
         for result in pool.imap_unordered(run_params, params):
             print >>out, result
