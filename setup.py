@@ -18,7 +18,7 @@ setup(
     provides=["georeg"],
     packages=["georeg"],
     package_data={"georeg": ['data/*.txt', 'configs/**/*.cfg']},
-    scripts=["scripts/georeg"],
+    scripts=["scripts/georeg", "scripts/georeg-sweep"],
     install_requires=[
         "fuzzywuzzy>=0.11.1",
         "geopy>=1.11.0",
