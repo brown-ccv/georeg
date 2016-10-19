@@ -17,7 +17,7 @@ setup(
         "Programming Language :: Python :: 2.7"],
     provides=["georeg"],
     packages=["georeg"],
-    package_data={"georeg": ['data/*.txt', 'configs/**/*.cfg']},
+    package_data={"georeg": ['data/*.txt', 'configs/**/*.cfg', 'configs/**/sweep.tsv']},
     scripts=["scripts/georeg", "scripts/georeg-sweep"],
     install_requires=[
         "fuzzywuzzy>=0.11.1",

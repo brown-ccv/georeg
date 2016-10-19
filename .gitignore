@@ -1,7 +1,7 @@
 build
 dist
 georeg.egg-info
-*.tsv
+*-compiled.tsv
 *.swp
 *.pyc
 *.tiff
