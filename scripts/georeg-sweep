@@ -1,0 +1,161 @@
+#!/usr/bin/env python
+
+import argparse
+import ast
+import csv
+import georeg
+import os
+import sys
+import time
+from datetime import datetime
+from itertools import izip, product
+from multiprocessing import Pool
+
+parser = argparse.ArgumentParser(description="process and geocode business registries")
+
+parser.add_argument(
+    "--images", "-i", required=True, help="""
+        Path of images to process (not a list, use unix file matching).""")
+parser.add_argument(
+    "--state", "-s", default="", required=True, help="""
+        US state to get city list.""")
+parser.add_argument(
+    "--year", "-y", type=int, required=True, help="""
+        The year of the registry.""")
+parser.add_argument(
+    "--output", "-o", required=True, help="""
+        Path to csv containing results of the sweep. The basedir will be used
+        to create a sub-directory for each parameter.""")
+parser.add_argument(
+    "--debug", action="store_true", help="""
+        Draw images showing intermediate output during processing.
+        (also turns off multiprocessing)""")
+parser.add_argument(
+    "--pre-processed", action="store_true", help="""
+        Assume images have been preprocessed by scan-tailor.""")
+
+args = parser.parse_args()
+
+# import registry processor based on year
+if args.state == 'RI':
+    if args.year > 1975:
+        from georeg.registry_processor_ri import RegistryProcessorNew as RegistryProcessor
+    else:
+        from georeg.registry_processor_ri import RegistryProcessorOld as RegistryProcessor
+elif args.state == 'TX':
+    if args.year == 2005 or args.year == 2011 or args.year == 2010:
+        from georeg.registry_processor_tx import RegistryProcessor2000s as RegistryProcessor
+    elif args.year == 1999:
+        from georeg.registry_processor_tx import RegistryProcessor1999 as RegistryProcessor
+    elif args.year == 1995:
+        from georeg.registry_processor_tx import RegistryProcessor1995 as RegistryProcessor
+    elif args.year == 1990:
+        from georeg.registry_processor_tx import RegistryProcessor1990 as RegistryProcessor
+    elif args.year == 1980 or args.year == 1985:
+        from georeg.registry_processor_tx import RegistryProcessor1980s as RegistryProcessor
+    elif args.year == 1975:
+        from georeg.registry_processor_tx import RegistryProcessor1975 as RegistryProcessor
+    elif args.year in [1965, 1970]:
+        from georeg.registry_processor_tx import RegistryProcessor1965 as RegistryProcessor
+    elif args.year == 1960:
+        from georeg.registry_processor_tx import RegistryProcessor1960 as RegistryProcessor
+    elif args.year == 1950 or args.year == 1954:
+        from georeg.registry_processor_tx import RegistryProcessor1950s as RegistryProcessor
+    else:
+        raise ValueError("%d is not a supported year for TX" % (args.year))
+else:
+    raise ValueError("%s is not a supported state" % (args.state))
+
+
+def run_params(params):
+    global args
+
+    start_time = time.time()
+
+    basedir = os.path.dirname(args.output)
+    outdir = os.path.join(basedir, *params)
+
+    if not os.path.isdir(outdir): os.makedirs(outdir)
+
+    reg_processor = RegistryProcessor()
+    reg_processor.initialize_state_year(args.state, args.year, init_city_detector=True, init_spellchecker=False)
+    reg_processor.draw_debug_images = args.debug
+    reg_processor.assume_pre_processed = args.pre_processed
+    reg_processor.outdir = outdir
+    reg_processor.remove_geoquery_log()
+    reg_processor.make_tess_api()
+
+    # set parameters
+    for name, param in izip(args.param_names, params):
+        setattr(reg_processor, name, param)
+
+    outname = os.path.join(outdir, "%d-compiled.tsv" % args.year)
+
+    ocr_confidence = 0
+    geocoder_success = 0
+    business_count = 0
+    business_count_std = 0
+
+    for image in args.images:
+        reg_processor.process_image(image)
+        reg_processor.record_to_tsv(outname, 'a')
+        ocr_confidence += reg_processor.mean_ocr_confidence()
+        geocoder_success += reg_processor.geocoder_success_rate()
+        std, avg = reg_processor.business_count_std_and_avg()
+        business_count += avg
+        business_count_std += std
+
+    norm = 1.0 / len(args.image)
+    ocr_confidence *= norm
+    geocoder_success *= norm
+    business_count *= norm
+    business_count_std *= norm
+
+    values = [
+        start_time,
+        time.time() - start_time,
+        ','.join(params),
+        ocr_confidence,
+        geocoder_success,
+        business_count,
+        business_count_std]
+
+    # return performance stats
+    return ','.join(map(str, values))
+
+
+def set_args(_args):
+    global args
+    args = _args
+
+
+if __name__ == "__main__":
+    global args
+
+    basepath = georeg.__path__[0]
+    paramfile = os.path.join(basepath, "configs", args.state, "sweep.txt")
+
+    if not os.path.isfile(paramfile):
+       raise ValueError("could not find parameters file for state '%s'" % args.state)
+
+    ranges = None
+    for row in csv.DictReader(open(paramfile), delimiter='\t'):
+        if row["year"] == args.year:
+            ranges = row
+    if ranges is None:
+        raise ValueError("no entry in parameters file for year '%d'" % args.year)
+    ranges.pop("year")
+    args.param_names = sorted(ranges)
+
+    for name, l in ranges.items():
+        ranges[name] = ast.literal_eval(l)
+
+    # determine all combinations of parameters
+    params = product(*[ranges[name] for name in args.param_names])
+
+    # TODO: restart from an existing output file
+
+    pool = Pool(initializer=set_args, initargs=[args])
+    with open(args.output, "w") as out:
+        for result in pool.imap_unordered(run_params, params):
+            print >>out, result
