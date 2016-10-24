@@ -369,8 +369,9 @@ class RegistryProcessor1990(RegistryProcessorTX):
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
         self.phone_pattern = re.compile(r'\(\d{3}\).*[[\s]+\[(.*)\]]*', re.DOTALL)
-        self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.address_pattern = re.compile(r'([^0-9\(]+)\s+TX\s+(\d{5}).*\)')
+        self.paren_pattern = re.compile(r'\s?([^\(]+)\s?\(')
+        self.address_pattern = re.compile(r'\s?([^0-9\(]+)\s+TX\s+(\d+).*\)')
+        self.box_pattern = re.compile(r'Box\s+\d+')
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1990"""
