@@ -11,11 +11,11 @@ def geocode_business(business, state = 'RI', timeout=60):
     return confidence score"""
 
     # Sub "I" with "1" for numeric values.
-    business.zip = business.zip.replace("I", "1")
-    pattern = re.compile("(^|\s)([I0-9]+)(\s|$)")
+    business.zip = business.zip.replace("I", "1").replace("l", "1").replace(" ", "")
+    pattern = re.compile("(^|\s)([Il0-9]+)(\s|$)")
     matches = re.findall(pattern, business.address)
     for _, match, _ in matches:
-        business.address = re.sub(match, match.replace("I", "1"),
+        business.address = re.sub(match, match.replace("I", "1").replace("l", "1"),
                                   business.address)
 
     try:
