@@ -311,7 +311,7 @@ class RegistryProcessor1980s(RegistryProcessorOldTX):
         self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
         self.registry_pattern = re.compile(r'[0-9]+')
         self.address_pattern = re.compile(r'(.+)\([A-Za-z]+') 
-        self.zip_pattern = re.compile(r'(\d{5})\)')
+        self.zip_pattern = re.compile(r'Tex[a-z\n ]{0,}([0-9 lI]+)\)')
         self.sic_pattern = re.compile(r'([A-Za-z\&,\s]+)\(([0-9A-Za-z\s]{4})\)')
         self.bracket_pattern = re.compile(r'\[(.*)\]')
        
