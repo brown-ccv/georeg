@@ -17,7 +17,11 @@ def geocode_business(business, state = 'RI', timeout=60):
     for _, match, _ in matches:
         business.address = re.sub(match, match.replace("I", "1").replace("l", "1"),
                                   business.address)
-
+    # strip white space edges of the string
+    business.zip = business.zip.strip()
+    business.address = business.address.strip()
+    business.city = business.city.strip()
+    
     try:
         location = geolocator.geocode(street=business.address, city=business.city,
                 state=state, zip_cd=business.zip, n_matches = 1, timeout = timeout)
