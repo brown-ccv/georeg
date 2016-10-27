@@ -519,7 +519,7 @@ class RegistryProcessor1999(RegistryProcessorTX):
         self.phone_pattern = re.compile(r'\d{3}/.*')
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.bad_address_pattern = re.compile(r'\(.*[,.](.*)[,.].*\s([0-9 lI]+).{0,}\)')
+        self.bad_address_pattern = re.compile(r'\(.*? B?o?x? \d{0,}[,.]?(.*)[,.].*\s([0-9 lI]+).{0,}\)')
         self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
 
     def _parse_registry_block(self, registry_txt):
