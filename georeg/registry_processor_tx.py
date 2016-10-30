@@ -516,11 +516,13 @@ class RegistryProcessor1999(RegistryProcessorTX):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{3}/.*')
+        self.phone_pattern = re.compile(r'\d{0,2}\s?\d{3}[/-].*')
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
         self.bad_address_pattern = re.compile(r'\(.*? B?o?x? \d{0,}[,.]?(.*)[,.].*\s([0-9 lI]+).{0,}\)')
+        self.bad_address_pattern2 = re.compile(r'\(mai.*[,.](.*)[.,].*\s([0-9 lI]+).{0,}\)')
         self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
+        self.hq_pattern = re.compile(r'^H[QO]\s.*')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -531,20 +533,27 @@ class RegistryProcessor1999(RegistryProcessorTX):
 
         full_address = ""
         for line in lines:
+            hq = self.hq_pattern.search(line)
             start = re.search('[0-9]{2,}', line)
             end = self.phone_pattern.search(line)
-            if start:
-                if end:
-                    break
-                full_address += ' ' + line
+            if not hq:
+                if start:
+                    if end:
+                        break
+                    full_address += ' ' + line
 
         match = self.paren_pattern.search(full_address)
         if match:
             business.address = match.group(1)
-            match = self.bad_address_pattern.search(full_address)
+            match = self.bad_address_pattern2.search(full_address)
             if match:
                 business.city = match.group(1)
                 business.zip = match.group(2)
+            else:
+                match = self.bad_address_pattern.search(full_address)
+                if match:
+                    business.city = match.group(1)
+                    business.zip = match.group(2)
         else:
             match = self.good_address_pattern.search(full_address)
             if match:
