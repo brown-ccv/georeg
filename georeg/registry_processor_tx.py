@@ -439,13 +439,15 @@ class RegistryProcessor1995(RegistryProcessorTX):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{3}/\d+', re.DOTALL) #.*[[\s]+\[(.*)\]]*', re.DOTALL)
+        self.phone_pattern = re.compile(r'[0-9 ]{3}[\/\(]\d+', re.DOTALL) #.*[[\s]+\[(.*)\]]*', re.DOTALL)
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.good_pattern_address = re.compile(r' (.*)[,.]\s+([A-Za-z][A-Za-z ]+) (\d{5})')
+        self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
         self.PO_box_pattern = re.compile(r'Box[\s]+[\d]+')
-        self.good_address_PO_pattern = re.compile(r' (.*)[,.].*[,.]\s+([A-Za-z][A-Za-z ]+) (\d+)')
-        self.bad_address_pattern = re.compile(r'\(mail: .*[,.]\s+([A-Za-z][A-Za-z ]+)[,.].*(\d{5}).*\)')
+        self.good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*)(\d{5})')
+        self.good_address_PO_pattern2 = re.compile(r'(.*)[,.]\s?PO Box \d+(.*)(\d{5})')
+        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*(\d{5}).{0,}\)')
+        self.bad_address_pattern2 = re.compile(r'\(mail:(.*)[,.](.*)(\d{5}).{0,}\)')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -470,6 +472,13 @@ class RegistryProcessor1995(RegistryProcessorTX):
             if match:
                 business.city = match.group(1)
                 business.zip = match.group(2)
+            else:
+                match = self.bad_address_pattern2.search(full_address)
+                if match:
+                    business.address = match.group(1)
+                    business.city = match.group(2)
+                    business.zip = match.group(3)
+
         else:
             match = self.PO_box_pattern.search(full_address)
             if match:
@@ -478,6 +487,13 @@ class RegistryProcessor1995(RegistryProcessorTX):
                     business.address = match.group(1)
                     business.city = match.group(2)
                     business.zip = match.group(3)
+                else:
+                    match = self.good_address_PO_pattern2.search(full_address)
+                    if match:
+                        business.address = match.group(1)
+                        business.city = match.group(2)
+                        business.zip = match.group(3)
+
             else:
                 match = self.good_address_pattern.search(full_address)
                 if match:
