@@ -516,7 +516,7 @@ class RegistryProcessor1999(RegistryProcessorTX):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{0,2}\s?\d{3}[/-].*')
+        self.phone_pattern = re.compile(r'\d{3,}[\/]')
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
         self.bad_address_pattern = re.compile(r'\(.*? B?o?x? \d{0,}[,.]?(.*)[,.].*\s([0-9 lI]+).{0,}\)')
