@@ -627,7 +627,7 @@ class RegistryProcessor2000s(RegistryProcessorTX):
         self.sic_pattern = re.compile(r'SIC-(.*)NAICS')
         self.emp_pattern = re.compile(r'Employs-(\d+)')
         self.sales_pattern = re.compile(r'Sales-(.*)')
-        self.address_pattern = re.compile(r'(.*?)\((.*?)\)')
+        self.address_pattern = re.compile(r'(.*?)\((\d{5}).{0,}\)')
         self.cat_desc_pattern = re.compile(r'NAICS-[\d:;\s]+(.*)')
         
     def _parse_registry_block(self, registry_txt):
@@ -641,7 +641,7 @@ class RegistryProcessor2000s(RegistryProcessorTX):
         
         # Get address lines
         full_address = ""
-        for line in lines:
+        for line in lines[1:]:
             start = re.search(r'[0-9]+', line)
             end = re.search(r'Phone', line)
             if start:
