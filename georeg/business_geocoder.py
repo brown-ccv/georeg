@@ -22,6 +22,8 @@ def geocode_business(business, state = 'RI', timeout=60):
     business.city = re.sub(r'[^a-zA-Z ]', "", business.city)
     # remove the word Fax. This is a common mistake in city names
     business.city = re.sub(r'Fax', "", business.city)
+    # remove non-digit characters from zip string
+    business.zip = re.sub(r'\D', "", business.zip)
 
     # strip white space edges of the string
     business.zip = business.zip.strip()
