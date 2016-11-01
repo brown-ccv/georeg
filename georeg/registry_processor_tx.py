@@ -439,15 +439,16 @@ class RegistryProcessor1995(RegistryProcessorTX):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'[0-9 ]{3}[\/\(]\d+', re.DOTALL) #.*[[\s]+\[(.*)\]]*', re.DOTALL)
+        self.phone_pattern = re.compile(r'[0-9 ]{3}.*[\[\]]', re.DOTALL)
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
         self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
         self.PO_box_pattern = re.compile(r'Box[\s]+[\d]+')
-        self.good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*)(\d{5})')
-        self.good_address_PO_pattern2 = re.compile(r'(.*)[,.]\s?PO Box \d+(.*)(\d{5})')
-        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*(\d{5}).{0,}\)')
-        self.bad_address_pattern2 = re.compile(r'\(mail:(.*)[,.](.*)(\d{5}).{0,}\)')
+        self.good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*?)(\d+)')
+        self.good_address_PO_pattern2 = re.compile(r'(.*)[,.]\s?PO Box \d+(.*?)(\d+)')
+        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*?(\d+).{0,}')
+        self.bad_address_pattern2 = re.compile(r'\(mail:(.*)[,.](.*?)([0-9 ]+).{0,}')
+        self.hq_pattern = re.compile(r'^H[QO]:\s.*')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -457,13 +458,15 @@ class RegistryProcessor1995(RegistryProcessorTX):
         business.name = lines[0]
 
         full_address = ""
-        for line in lines:
+        for line in lines[1:]:
+            hq = self.hq_pattern.search(line)
             start = re.search('[0-9]{2,}', line)
             end = self.phone_pattern.search(line)
-            if start:
-                if end:
-                    break
-                full_address += ' '+line
+            if not hq:
+                if start:
+                    if end:
+                        break
+                    full_address += ' ' + line
 
         match = self.paren_pattern.search(full_address)
         if match:
@@ -517,6 +520,11 @@ class RegistryProcessor1995(RegistryProcessorTX):
         match = self.emp_pattern.search(registry_txt)
         if match:
             business.emp = match.group(1)
+        # modify business.address and re.sub 
+        pattern = re.compile(r'.*\d (8) \w.*')
+        match = re.search(pattern, business.address)
+        if match:
+            business.address = re.sub(match.group(1), match.group(1).replace("8", "S"), business.address)
 
         return business
 
