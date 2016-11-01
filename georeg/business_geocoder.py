@@ -17,11 +17,18 @@ def geocode_business(business, state = 'RI', timeout=60):
     for _, match, _ in matches:
         business.address = re.sub(match, match.replace("I", "1").replace("l", "1"),
                                   business.address)
+    # remove extra non-word characters from an address string
+    business.address = re.sub(r'\W', " ", business.address)
+
+    # replace 2 or more white spaces with a single white space
+    business.address = re.sub(r'\s{2,}', " ", business.address)
 
     # remove extra non-word characters from city string
     business.city = re.sub(r'[^a-zA-Z ]', "", business.city)
+
     # remove the word Fax. This is a common mistake in city names
     business.city = re.sub(r'Fax', "", business.city)
+
     # remove non-digit characters from zip string
     business.zip = re.sub(r'\D', "", business.zip)
 
