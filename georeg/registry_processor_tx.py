@@ -370,8 +370,9 @@ class RegistryProcessor1990(RegistryProcessorTX):
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
         self.phone_pattern = re.compile(r'\(\d{3}\).*[[\s]+\[(.*)\]]*', re.DOTALL)
         self.paren_pattern = re.compile(r'\s?([^\(]+)\s?\(')
-        self.address_pattern = re.compile(r'\s?([^0-9\(]+)\s+TX\s+(\d+).*\)')
+        self.address_pattern = re.compile(r'\s?([^0-9\(]+)T\s{0,}X([0-9 .,\']+).{0,}\)')
         self.box_pattern = re.compile(r'Box\s+\d+')
+        self.hq_pattern = re.compile(r'^H[QO0]:\s.*')
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1990"""
@@ -383,13 +384,16 @@ class RegistryProcessor1990(RegistryProcessorTX):
         business.name = lines[0]
 
         full_address = ""
-        for line in lines:
+        for line in lines[1:]:
+            hq = self.hq_pattern.search(line)
             start = re.search(r'[0-9]{2,}', line)
             end = self.phone_pattern.search(line)
-            if start:
-                if end:
-                    break
-                full_address += ' '+line
+            if not hq:
+                if start:
+                    if end:
+                        break
+                    full_address += ' '+line
+        full_address = full_address.replace("\n", "")
 
         match = self.paren_pattern.search(full_address)
         if match:
@@ -448,7 +452,7 @@ class RegistryProcessor1995(RegistryProcessorTX):
         self.good_address_PO_pattern2 = re.compile(r'(.*)[,.]\s?PO Box \d+(.*?)(\d+)')
         self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*?(\d+).{0,}')
         self.bad_address_pattern2 = re.compile(r'\(mail:(.*)[,.](.*?)([0-9 ]+).{0,}')
-        self.hq_pattern = re.compile(r'^H[QO]:\s.*')
+        self.hq_pattern = re.compile(r'^H[QO0]:\s.*')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -627,7 +631,7 @@ class RegistryProcessor2000s(RegistryProcessorTX):
         self.sic_pattern = re.compile(r'SIC-(.*)NAICS')
         self.emp_pattern = re.compile(r'Employs-(\d+)')
         self.sales_pattern = re.compile(r'Sales-(.*)')
-        self.address_pattern = re.compile(r'(.*?)\((\d{5}).{0,}\)')
+        self.address_pattern = re.compile(r'(.*?)\(([\d., \'"]+).{0,}\)')
         self.cat_desc_pattern = re.compile(r'NAICS-[\d:;\s]+(.*)')
         
     def _parse_registry_block(self, registry_txt):
