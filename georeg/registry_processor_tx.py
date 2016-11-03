@@ -301,8 +301,7 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
 
         return business
 
-
-class RegistryProcessor1980s(RegistryProcessorOldTX):
+class RegistryProcessor1980(RegistryProcessorOldTX):
     """1980s TX registry parser."""
 
     def __init__(self):
@@ -314,6 +313,63 @@ class RegistryProcessor1980s(RegistryProcessorOldTX):
         self.zip_pattern = re.compile(r'Tex[a-z\n ]{0,}([0-9 lI]+)\)')
         self.sic_pattern = re.compile(r'([A-Za-z\&,\s]+)\(([0-9A-Za-z\s]{4})\)')
         self.bracket_pattern = re.compile(r'\[(.*)\]')
+        
+       
+    def _parse_registry_block(self, registry_txt):
+        business = reg.Business()
+
+        lines = registry_txt.split('\n')
+       
+        # Set first line as business name.
+        business.name = lines[0]
+        
+        # Delete lines that list managers/presidents/administrators.
+        man_pattern = re.compile(r':\s([A-Za-z \t\r\f\v]+)')
+        man_matches = man_pattern.findall(registry_txt)
+        for match in man_matches:
+            registry_txt = registry_txt.replace(match, '')
+        
+        # Find address match.
+        address_match = re.search(self.address_pattern, registry_txt)
+        if address_match:
+            business.address = address_match.group(1)
+        zip_match = re.search(self.zip_pattern, registry_txt)
+        if zip_match:
+            business.zip = zip_match.group(1)
+
+        # Delete newline markers.
+        registry_txt = registry_txt.replace('\n', '')
+        
+        # Find SIC matches.
+        sic_matches = self.sic_pattern.findall(registry_txt)
+        for desc, num in sic_matches:
+            business.category.append(num)
+            business.cat_desc.append(desc)
+
+        # Find bracket match.
+        bracket_match = re.search(self.bracket_pattern, registry_txt)
+        if bracket_match:
+            business.bracket = bracket_match.group(1)
+
+        # Set business.city
+        business.city = self.current_city 
+
+        return business
+
+
+class RegistryProcessor1985(RegistryProcessorOldTX):
+    """1980s TX registry parser."""
+
+    def __init__(self):
+        super(RegistryProcessor1980s, self).__init__()
+        
+        self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
+        self.registry_pattern = re.compile(r'[0-9]+')
+        self.address_pattern = re.compile(r'(.+)\([A-Za-z]+') 
+        self.zip_pattern = re.compile(r'Tex[a-z\n ]{0,}([0-9 lI]+)\)')
+        self.sic_pattern = re.compile(r'([A-Za-z\&,\s]+)\(([0-9A-Za-z\s]{4})\)')
+        self.bracket_pattern = re.compile(r'\[(.*)\]')
+        
        
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
