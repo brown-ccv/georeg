@@ -302,14 +302,14 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         return business
 
 class RegistryProcessor1980(RegistryProcessorOldTX):
-    """1980s TX registry parser."""
+    """1980 TX registry parser."""
 
     def __init__(self):
-        super(RegistryProcessor1980s, self).__init__()
+        super(RegistryProcessor1980, self).__init__()
         
         self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
         self.registry_pattern = re.compile(r'[0-9]+')
-        self.address_pattern = re.compile(r'(.+)\([A-Za-z]+') 
+        self.address_pattern = re.compile(r'(.+)\(.{0,}?(\d+)\)') 
         self.zip_pattern = re.compile(r'Tex[a-z\n ]{0,}([0-9 lI]+)\)')
         self.sic_pattern = re.compile(r'([A-Za-z\&,\s]+)\(([0-9A-Za-z\s]{4})\)')
         self.bracket_pattern = re.compile(r'\[(.*)\]')
@@ -333,10 +333,8 @@ class RegistryProcessor1980(RegistryProcessorOldTX):
         address_match = re.search(self.address_pattern, registry_txt)
         if address_match:
             business.address = address_match.group(1)
-        zip_match = re.search(self.zip_pattern, registry_txt)
-        if zip_match:
-            business.zip = zip_match.group(1)
-
+            business.zip = address_match.group(2)
+       
         # Delete newline markers.
         registry_txt = registry_txt.replace('\n', '')
         
@@ -358,10 +356,10 @@ class RegistryProcessor1980(RegistryProcessorOldTX):
 
 
 class RegistryProcessor1985(RegistryProcessorOldTX):
-    """1980s TX registry parser."""
+    """1985 TX registry parser."""
 
     def __init__(self):
-        super(RegistryProcessor1980s, self).__init__()
+        super(RegistryProcessor1985, self).__init__()
         
         self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
         self.registry_pattern = re.compile(r'[0-9]+')
