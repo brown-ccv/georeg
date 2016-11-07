@@ -202,7 +202,8 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
         self.registry_pattern = re.compile(r'[\[\]()]')
         self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
         self.name_pattern_2 = re.compile(r'(.+?),')
-        self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
+        self.address_pattern = re.compile(r'(.+?)B[o0]x.{0,}\[(.*)\]')
+        self.address_pattern2 = re.compile(r'(.+?)\[(.*)\]')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _process_contour(self, contour_txt, contour_font_attrs):
@@ -238,6 +239,12 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
             business.address = address_match.group(1)
             business.bracket = address_match.group(2)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+        else:
+            address_match = re.search(self.address_pattern, registry_txt)
+            if address_match:
+                business.address = address_match.group(1)
+                business.bracket = address_match.group(2)
+                registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
         # Find SIC matches.
         sic_matches = self.sic_pattern.findall(registry_txt)
@@ -262,7 +269,10 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         self.registry_pattern = re.compile(r'[\[\]()]')
         self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
         self.name_pattern_2 = re.compile(r'(.+?),')
-        self.address_pattern = re.compile(r'(.*)\(.*(\d{5})\)\s*\[(.*)\]')
+        self.address_pattern = re.compile(r'\)(.*)B[o0]x.*\((\d{5})\).*?\[(.*)\]')
+        self.address_pattern2 = re.compile(r'\)(.*)\((\d{5})\).*?\[(.*)\]')
+        self.address_pattern3 = re.compile(r'(\d+.*)B[o0]x.*\(.*(\d{5})\)\s*\[(.*)\]')
+        self.address_pattern4 = re.compile(r'(\d+.*)\(.*(\d{5})\)\s*\[(.*)\]')     
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _parse_registry_block(self, registry_txt):
@@ -289,7 +299,28 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
             business.zip = address_match.group(2)
             business.bracket = address_match.group(3)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
-
+        else:
+            address_match = re.search(self.address_pattern2, registry_txt)
+            if address_match:
+                 business.address = address_match.group(1)
+                 business.zip = address_match.group(2)
+                 business.bracket = address_match.group(3)
+                 registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+            else:
+                address_match = re.search(self.address_pattern3, registry_txt)
+                if address_match:
+                    business.address = address_match.group(1)
+                    business.zip = address_match.group(2)
+                    business.bracket = address_match.group(3)
+                    registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+                else:
+                    address_match = re.search(self.address_pattern4, registry_txt)
+                    if address_match:
+                        business.address = address_match.group(1)
+                        business.zip = address_match.group(2)
+                        business.bracket = address_match.group(3)
+                        registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+                
         # Find SIC matches.
         sic_matches = self.sic_pattern.findall(registry_txt)
         for desc, num in sic_matches:
