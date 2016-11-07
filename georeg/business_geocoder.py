@@ -17,7 +17,6 @@ def geocode_business(business, state = 'RI', timeout=60):
     for _, match, _ in matches:
         business.address = re.sub(match, match.replace("I", "1").replace("l", "1"),
                                   business.address)
-
     # remove extra non-word characters from an address string
     business.address = re.sub(r'\W', " ", business.address)
 
@@ -38,15 +37,10 @@ def geocode_business(business, state = 'RI', timeout=60):
     business.address = business.address.strip()
     business.city = business.city.strip()
     
-    zip_pattern = re.compile(r'\d{5}')
+
 
     try:
-        zipcode = re.search(r'\d{5}', business.zip)
-        if zipcode:
-            location = geolocator.geocode(street=business.address,
-                state=state, zip_cd=business.zip, n_matches = 1, timeout = timeout)
-        else:    
-            location = geolocator.geocode(street=business.address, city=business.city,
+        location = geolocator.geocode(street=business.address, city=business.city,
                 state=state, zip_cd=business.zip, n_matches = 1, timeout = timeout)
     except:
         location = None
