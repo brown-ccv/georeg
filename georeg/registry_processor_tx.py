@@ -309,8 +309,8 @@ class RegistryProcessor1980(RegistryProcessorOldTX):
         
         self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
         self.registry_pattern = re.compile(r'[0-9]+')
-        self.address_pattern = re.compile(r'(.+)\(.{0,}?(\d+)\)') 
-        self.zip_pattern = re.compile(r'Tex[a-z\n ]{0,}([0-9 lI]+)\)')
+        self.address_pattern = re.compile(r'(.+)\(.{0,}') 
+        self.zip_pattern = re.compile(r'(\d{5})\)')
         self.sic_pattern = re.compile(r'([A-Za-z\&,\s]+)\(([0-9A-Za-z\s]{4})\)')
         self.bracket_pattern = re.compile(r'\[(.*)\]')
         
@@ -333,7 +333,10 @@ class RegistryProcessor1980(RegistryProcessorOldTX):
         address_match = re.search(self.address_pattern, registry_txt)
         if address_match:
             business.address = address_match.group(1)
-            business.zip = address_match.group(2)
+
+        zip_match = re.search(self.zip_pattern, registry_txt)
+        if zip_match:
+            business.zip = zip_match.group(1)
        
         # Delete newline markers.
         registry_txt = registry_txt.replace('\n', '')
