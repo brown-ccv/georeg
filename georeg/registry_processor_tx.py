@@ -151,9 +151,10 @@ class RegistryProcessor1960(RegistryProcessorOldTX):
          
         self.city_pattern = re.compile(r'^([A-Z\s]+),?\s*([A-Za-z\s]+Metropolitan\s*Area)?\.?$')
         self.registry_pattern = re.compile(r'[\[\]()]')
-        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
-        self.name_pattern_2 = re.compile(r'(.+?),')
-        self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
+        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s{0,}')
+        self.name_pattern_2 = re.compile(r'(.+?),s{0,}')       
+        self.address_pattern = re.compile(r'([^\(]{0,}).{0,}(B[oO0][xX].{0,})\[(.*)\]')
+        self.address_pattern2 = re.compile(r'([^\(]*).{0,}\[(.*)\]')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _parse_registry_block(self, registry_txt):
@@ -176,9 +177,18 @@ class RegistryProcessor1960(RegistryProcessorOldTX):
         # Find address and bracket matches.
         address_match = re.search(self.address_pattern, registry_txt)
         if address_match:
-            business.address = address_match.group(1)
-            business.bracket = address_match.group(2)
+            if address_match.group(1):
+                business.address = address_match.group(1)
+            else:
+                business.address = address_match.group(2)
+            business.bracket = address_match.group(3)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+        else:
+            address_match = re.search(self.address_pattern2, registry_txt)
+            if address_match:
+                business.address = address_match.group(1)
+                business.bracket = address_match.group(2)
+                registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
         # Find SIC matches.
         sic_matches = self.sic_pattern.findall(registry_txt)
