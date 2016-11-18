@@ -56,8 +56,10 @@ elif args.state == 'TX':
         from georeg.registry_processor_tx import RegistryProcessor1995 as RegistryProcessor
     elif args.year == 1990:
         from georeg.registry_processor_tx import RegistryProcessor1990 as RegistryProcessor
-    elif args.year == 1980 or args.year == 1985:
-        from georeg.registry_processor_tx import RegistryProcessor1980s as RegistryProcessor
+    elif args.year == 1985:
+        from georeg.registry_processor_tx import RegistryProcessor1985 as RegistryProcessor
+    elif args.year == 1980:
+        from georeg.registry_processor_tx import RegistryProcessor1980 as RegistryProcessor
     elif args.year == 1975:
         from georeg.registry_processor_tx import RegistryProcessor1975 as RegistryProcessor
     elif args.year in [1965, 1970]:

@@ -151,9 +151,10 @@ class RegistryProcessor1960(RegistryProcessorOldTX):
          
         self.city_pattern = re.compile(r'^([A-Z\s]+),?\s*([A-Za-z\s]+Metropolitan\s*Area)?\.?$')
         self.registry_pattern = re.compile(r'[\[\]()]')
-        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
-        self.name_pattern_2 = re.compile(r'(.+?),')
-        self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
+        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s{0,}')
+        self.name_pattern_2 = re.compile(r'(.+?),s{0,}')       
+        self.address_pattern = re.compile(r'([^\(]{0,}).{0,}(B[oO0][xX].{0,})\[(.*)\]')
+        self.address_pattern2 = re.compile(r'([^\(]*).{0,}\[(.*)\]')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _parse_registry_block(self, registry_txt):
@@ -176,9 +177,18 @@ class RegistryProcessor1960(RegistryProcessorOldTX):
         # Find address and bracket matches.
         address_match = re.search(self.address_pattern, registry_txt)
         if address_match:
-            business.address = address_match.group(1)
-            business.bracket = address_match.group(2)
+            if address_match.group(1):
+                business.address = address_match.group(1)
+            else:
+                business.address = address_match.group(2)
+            business.bracket = address_match.group(3)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+        else:
+            address_match = re.search(self.address_pattern2, registry_txt)
+            if address_match:
+                business.address = address_match.group(1)
+                business.bracket = address_match.group(2)
+                registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
         # Find SIC matches.
         sic_matches = self.sic_pattern.findall(registry_txt)
@@ -198,11 +208,12 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
         super(RegistryProcessor1965, self).__init__()
          
         self.current_zip = ""
-        self.city_pattern = re.compile(r'(^[A-Z\s]+)(\d{5})\s+[A-Za-z\s]+County$')
+        self.city_pattern = re.compile(r'(^[A-Z\s]{0,})(\d{5}).*County$')
         self.registry_pattern = re.compile(r'[\[\]()]')
-        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
-        self.name_pattern_2 = re.compile(r'(.+?),')
-        self.address_pattern = re.compile(r'(.+?)\[(.*)\]')
+        self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s+')
+        self.name_pattern_2 = re.compile(r'(.+?),\s+')
+        self.address_pattern = re.compile(r'(.{0,})(B[oO0][xX].{0,})\[(.*)\]')
+        self.address_pattern2 = re.compile(r'([^\(]*).{0,}\[(.*)\]')
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _process_contour(self, contour_txt, contour_font_attrs):
@@ -219,7 +230,7 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
         business = reg.Business()
 
         lines = registry_txt.split('\n')
-        registry_txt = registry_txt.replace('\n', '')
+        registry_txt = registry_txt.replace('\n', '').replace('\r', '')
 
         # Look for name match in first line.
         name_match = re.match(self.name_pattern_1, lines[0])
@@ -235,9 +246,18 @@ class RegistryProcessor1965(RegistryProcessorOldTX):
         # Find address and bracket matches.
         address_match = re.search(self.address_pattern, registry_txt)
         if address_match:
-            business.address = address_match.group(1)
-            business.bracket = address_match.group(2)
+            if address_match.group(1):
+                business.address = address_match.group(1)
+            else:
+                business.address = address_match.group(2)
+            business.bracket = address_match.group(3)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+        else:
+            address_match = re.search(self.address_pattern2, registry_txt)
+            if address_match:
+                business.address = address_match.group(1)
+                business.bracket = address_match.group(2)
+                registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
 
         # Find SIC matches.
         sic_matches = self.sic_pattern.findall(registry_txt)
@@ -262,7 +282,10 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
         self.registry_pattern = re.compile(r'[\[\]()]')
         self.name_pattern_1 = re.compile(r'.+(Inc|Co|Corp|Ltd|Mfg)\s*\.?\s*,\s*')
         self.name_pattern_2 = re.compile(r'(.+?),')
-        self.address_pattern = re.compile(r'(.*)\(.*(\d{5})\)\s*\[(.*)\]')
+        self.address_pattern = re.compile(r'\)(.*)B[oO0][Xx].*\((\d{5})\).*?\[(.*)\]')
+        self.address_pattern2 = re.compile(r'\)(.*)\((\d{5})\).*?\[(.*)\]')
+        self.address_pattern3 = re.compile(r'(\d+.*)B[oO0][Xx].*\(.*(\d{5})\)\s*\[(.*)\]')
+        self.address_pattern4 = re.compile(r'(\d+.*)\(.*(\d{5})\)\s*\[(.*)\]')     
         self.sic_pattern = re.compile(r'([A-Za-z,\s]+)\((\d{4})\)')
 
     def _parse_registry_block(self, registry_txt):
@@ -289,7 +312,28 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
             business.zip = address_match.group(2)
             business.bracket = address_match.group(3)
             registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
-
+        else:
+            address_match = re.search(self.address_pattern2, registry_txt)
+            if address_match:
+                 business.address = address_match.group(1)
+                 business.zip = address_match.group(2)
+                 business.bracket = address_match.group(3)
+                 registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+            else:
+                address_match = re.search(self.address_pattern3, registry_txt)
+                if address_match:
+                    business.address = address_match.group(1)
+                    business.zip = address_match.group(2)
+                    business.bracket = address_match.group(3)
+                    registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+                else:
+                    address_match = re.search(self.address_pattern4, registry_txt)
+                    if address_match:
+                        business.address = address_match.group(1)
+                        business.zip = address_match.group(2)
+                        business.bracket = address_match.group(3)
+                        registry_txt = re.sub(re.escape(address_match.group(0)), '', registry_txt)
+                
         # Find SIC matches.
         sic_matches = self.sic_pattern.findall(registry_txt)
         for desc, num in sic_matches:
@@ -301,19 +345,76 @@ class RegistryProcessor1975(RegistryProcessorOldTX):
 
         return business
 
-
-class RegistryProcessor1980s(RegistryProcessorOldTX):
-    """1980s TX registry parser."""
+class RegistryProcessor1980(RegistryProcessorOldTX):
+    """1980 TX registry parser."""
 
     def __init__(self):
-        super(RegistryProcessor1980s, self).__init__()
+        super(RegistryProcessor1980, self).__init__()
+        
+        self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
+        self.registry_pattern = re.compile(r'[0-9]+')
+        self.address_pattern = re.compile(r'(.+)\(.{0,}') 
+        self.zip_pattern = re.compile(r'(\d{5})\)')
+        self.sic_pattern = re.compile(r'([A-Za-z\&,\s]+)\(([0-9A-Za-z\s]{4})\)')
+        self.bracket_pattern = re.compile(r'\[(.*)\]')
+        
+       
+    def _parse_registry_block(self, registry_txt):
+        business = reg.Business()
+
+        lines = registry_txt.split('\n')
+       
+        # Set first line as business name.
+        business.name = lines[0]
+        
+        # Delete lines that list managers/presidents/administrators.
+        man_pattern = re.compile(r':\s([A-Za-z \t\r\f\v]+)')
+        man_matches = man_pattern.findall(registry_txt)
+        for match in man_matches:
+            registry_txt = registry_txt.replace(match, '')
+        
+        # Find address match.
+        address_match = re.search(self.address_pattern, registry_txt)
+        if address_match:
+            business.address = address_match.group(1)
+
+        zip_match = re.search(self.zip_pattern, registry_txt)
+        if zip_match:
+            business.zip = zip_match.group(1)
+       
+        # Delete newline markers.
+        registry_txt = registry_txt.replace('\n', '')
+        
+        # Find SIC matches.
+        sic_matches = self.sic_pattern.findall(registry_txt)
+        for desc, num in sic_matches:
+            business.category.append(num)
+            business.cat_desc.append(desc)
+
+        # Find bracket match.
+        bracket_match = re.search(self.bracket_pattern, registry_txt)
+        if bracket_match:
+            business.bracket = bracket_match.group(1)
+
+        # Set business.city
+        business.city = self.current_city 
+
+        return business
+
+
+class RegistryProcessor1985(RegistryProcessorOldTX):
+    """1985 TX registry parser."""
+
+    def __init__(self):
+        super(RegistryProcessor1985, self).__init__()
         
         self.city_pattern = re.compile(r'(.*)(\s[A-Za-z]+\s)County') 
         self.registry_pattern = re.compile(r'[0-9]+')
         self.address_pattern = re.compile(r'(.+)\([A-Za-z]+') 
-        self.zip_pattern = re.compile(r'(\d{5})\)')
+        self.zip_pattern = re.compile(r'Tex[a-z\n ]{0,}([0-9 lI]+)\)')
         self.sic_pattern = re.compile(r'([A-Za-z\&,\s]+)\(([0-9A-Za-z\s]{4})\)')
         self.bracket_pattern = re.compile(r'\[(.*)\]')
+        
        
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -369,8 +470,10 @@ class RegistryProcessor1990(RegistryProcessorTX):
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
         self.phone_pattern = re.compile(r'\(\d{3}\).*[[\s]+\[(.*)\]]*', re.DOTALL)
-        self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.address_pattern = re.compile(r'([^0-9\(]+)\s+TX\s+(\d{5}).*\)')
+        self.paren_pattern = re.compile(r'\s?([^\(]+)\s?\(')
+        self.address_pattern = re.compile(r'\s?([^0-9\(]+)T\s{0,}X([0-9 .,\']+).{0,}\)')
+        self.box_pattern = re.compile(r'Box\s+\d+')
+        self.hq_pattern = re.compile(r'^H[QO0]:\s.*')
 
     def _parse_registry_block(self, registry_txt):
         """works for registries from 1990"""
@@ -382,13 +485,16 @@ class RegistryProcessor1990(RegistryProcessorTX):
         business.name = lines[0]
 
         full_address = ""
-        for line in lines:
+        for line in lines[1:]:
+            hq = self.hq_pattern.search(line)
             start = re.search(r'[0-9]{2,}', line)
             end = self.phone_pattern.search(line)
-            if start:
-                if end:
-                    break
-                full_address += ' '+line
+            if not hq:
+                if start:
+                    if end:
+                        break
+                    full_address += ' '+line
+        full_address = full_address.replace("\n", "")
 
         match = self.paren_pattern.search(full_address)
         if match:
@@ -438,13 +544,16 @@ class RegistryProcessor1995(RegistryProcessorTX):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{3}/.*[[\s]+\[(.*)\]]*', re.DOTALL)
+        self.phone_pattern = re.compile(r'[0-9 ]{3}.*[\[\]]', re.DOTALL)
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
         self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
         self.PO_box_pattern = re.compile(r'Box[\s]+[\d]+')
-        self.good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*)(\d{5})')
-        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*(\d{5}).*\)')
+        self.good_address_PO_pattern = re.compile(r'(.*)[,.].*[,.](.*?)(\d+)')
+        self.good_address_PO_pattern2 = re.compile(r'(.*)[,.]\s?PO Box \d+(.*?)(\d+)')
+        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*?(\d+).{0,}')
+        self.bad_address_pattern2 = re.compile(r'\(mail:(.*)[,.](.*?)([0-9 ]+).{0,}')
+        self.hq_pattern = re.compile(r'^H[QO0]:\s.*')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -454,13 +563,15 @@ class RegistryProcessor1995(RegistryProcessorTX):
         business.name = lines[0]
 
         full_address = ""
-        for line in lines:
+        for line in lines[1:]:
+            hq = self.hq_pattern.search(line)
             start = re.search('[0-9]{2,}', line)
             end = self.phone_pattern.search(line)
-            if start:
-                if end:
-                    break
-                full_address += ' '+line
+            if not hq:
+                if start:
+                    if end:
+                        break
+                    full_address += ' ' + line
 
         match = self.paren_pattern.search(full_address)
         if match:
@@ -469,6 +580,13 @@ class RegistryProcessor1995(RegistryProcessorTX):
             if match:
                 business.city = match.group(1)
                 business.zip = match.group(2)
+            else:
+                match = self.bad_address_pattern2.search(full_address)
+                if match:
+                    business.address = match.group(1)
+                    business.city = match.group(2)
+                    business.zip = match.group(3)
+
         else:
             match = self.PO_box_pattern.search(full_address)
             if match:
@@ -477,6 +595,13 @@ class RegistryProcessor1995(RegistryProcessorTX):
                     business.address = match.group(1)
                     business.city = match.group(2)
                     business.zip = match.group(3)
+                else:
+                    match = self.good_address_PO_pattern2.search(full_address)
+                    if match:
+                        business.address = match.group(1)
+                        business.city = match.group(2)
+                        business.zip = match.group(3)
+
             else:
                 match = self.good_address_pattern.search(full_address)
                 if match:
@@ -500,6 +625,11 @@ class RegistryProcessor1995(RegistryProcessorTX):
         match = self.emp_pattern.search(registry_txt)
         if match:
             business.emp = match.group(1)
+        # modify business.address and re.sub 
+        pattern = re.compile(r'.*\d (8) \w.*')
+        match = re.search(pattern, business.address)
+        if match:
+            business.address = re.sub(match.group(1), match.group(1).replace("8", "S"), business.address)
 
         return business
 
@@ -515,11 +645,13 @@ class RegistryProcessor1999(RegistryProcessorTX):
         self.sales_pattern = re.compile(r'Sales[\:\s]+(.*million)')
         self.emp_pattern = re.compile(r'([0-9]+-[0-9]+)[\s]+employees')
         self.sic_pattern = re.compile(r'\d{4}:[\s]+.*$', re.DOTALL)
-        self.phone_pattern = re.compile(r'\d{3}/.*')
+        self.phone_pattern = re.compile(r'\d{3,}[\/]')
         self.no_paren_pattern = re.compile(r'[^\(]+')
         self.paren_pattern = re.compile(r'([^\(]+)\(')
-        self.bad_address_pattern = re.compile(r'\(mail:.*[,.](.*)[,.].*(\d{5})-\d{4}\)')
+        self.bad_address_pattern = re.compile(r'\(.*? B?o?x? \d{0,}[,.]?(.*)[,.].*\s([0-9 lI]+).{0,}\)')
+        self.bad_address_pattern2 = re.compile(r'\(mai.*[,.](.*)[.,].*\s([0-9 lI]+).{0,}\)')
         self.good_address_pattern = re.compile(r'(.*)[,.](.*)(\d{5})')
+        self.hq_pattern = re.compile(r'^H[QO]\s.*')
 
     def _parse_registry_block(self, registry_txt):
         business = reg.Business()
@@ -530,20 +662,27 @@ class RegistryProcessor1999(RegistryProcessorTX):
 
         full_address = ""
         for line in lines:
+            hq = self.hq_pattern.search(line)
             start = re.search('[0-9]{2,}', line)
             end = self.phone_pattern.search(line)
-            if start:
-                if end:
-                    break
-                full_address += ' ' + line
+            if not hq:
+                if start:
+                    if end:
+                        break
+                    full_address += ' ' + line
 
         match = self.paren_pattern.search(full_address)
         if match:
             business.address = match.group(1)
-            match = self.bad_address_pattern.search(full_address)
+            match = self.bad_address_pattern2.search(full_address)
             if match:
                 business.city = match.group(1)
                 business.zip = match.group(2)
+            else:
+                match = self.bad_address_pattern.search(full_address)
+                if match:
+                    business.city = match.group(1)
+                    business.zip = match.group(2)
         else:
             match = self.good_address_pattern.search(full_address)
             if match:
@@ -593,7 +732,7 @@ class RegistryProcessor2000s(RegistryProcessorTX):
         self.sic_pattern = re.compile(r'SIC-(.*)NAICS')
         self.emp_pattern = re.compile(r'Employs-(\d+)')
         self.sales_pattern = re.compile(r'Sales-(.*)')
-        self.address_pattern = re.compile(r'(.*?)\((.*?)\)')
+        self.address_pattern = re.compile(r'(.*?)\(([\d., \'"]+).{0,}\)')
         self.cat_desc_pattern = re.compile(r'NAICS-[\d:;\s]+(.*)')
         
     def _parse_registry_block(self, registry_txt):
@@ -607,7 +746,7 @@ class RegistryProcessor2000s(RegistryProcessorTX):
         
         # Get address lines
         full_address = ""
-        for line in lines:
+        for line in lines[1:]:
             start = re.search(r'[0-9]+', line)
             end = re.search(r'Phone', line)
             if start:

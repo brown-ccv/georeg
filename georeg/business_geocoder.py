@@ -11,12 +11,33 @@ def geocode_business(business, state = 'RI', timeout=60):
     return confidence score"""
 
     # Sub "I" with "1" for numeric values.
-    business.zip = business.zip.replace("I", "1")
-    pattern = re.compile("(^|\s)([I0-9]+)(\s|$)")
+    business.zip = business.zip.replace("I", "1").replace("l", "1").replace(" ", "")
+    pattern = re.compile("(^|\s)([Il0-9]+)(\s|$)")
     matches = re.findall(pattern, business.address)
     for _, match, _ in matches:
-        business.address = re.sub(match, match.replace("I", "1"),
+        business.address = re.sub(match, match.replace("I", "1").replace("l", "1"),
                                   business.address)
+    # remove extra non-word characters from an address string
+    business.address = re.sub(r'\W', " ", business.address)
+
+    # replace 2 or more white spaces with a single white space
+    business.address = re.sub(r'\s{2,}', " ", business.address)
+
+    # remove extra non-word characters from city string
+    business.city = re.sub(r'[^a-zA-Z ]', "", business.city)
+
+    # remove the word Fax. This is a common mistake in city names
+    business.city = re.sub(r'Fax', "", business.city)
+
+    # remove non-digit characters from zip string
+    business.zip = re.sub(r'\D', "", business.zip)
+
+    # strip white space edges of the string
+    business.zip = business.zip.strip()
+    business.address = business.address.strip()
+    business.city = business.city.strip()
+    
+
 
     try:
         location = geolocator.geocode(street=business.address, city=business.city,
