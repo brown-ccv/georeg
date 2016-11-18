@@ -73,7 +73,6 @@ else:
 
 def run_params(params):
     global args
-    print args
 
     start_time = time.time()
 
