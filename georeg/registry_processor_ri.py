@@ -9,6 +9,61 @@ import registry_processor as reg
 import business_geocoder as geo
 from operator import itemgetter, attrgetter
 
+class RegistryProcessor1998(reg.RegistryProcessor):
+    """1998 and 2002 RI registry parser."""
+    
+    def __init__(self):
+        super(RegistryProcessor1998, self).__init__()
+         
+        self.current_sic = ""
+
+        self.city_pattern = re.compile(r'[A-Za-z ]+(?=[,.][ ]+[A-Z]{2}[ ]+[0-9]{5})')
+        self.emp_pattern = re.compile(r'[Ee][Mm][Pp].*\d+')
+        self.registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
+        self.sic_pattern = re.compile(r'\d{4}')
+
+    def _process_contour(self, contour_txt, contour_font_attrs):
+        registry_match = self.registry_pattern.match(contour_txt)
+        sic_match = self.sic_pattern.match(contour_txt)
+
+        if registry_match:
+            business = self._parse_registry_block(contour_txt)
+            business.category = self.current_sic
+
+            geo.geocode_business(business)
+            return business
+        elif sic_match:
+            self.current_sic = sic_match.group(0)
+        return reg.Business()
+
+
+    def _parse_registry_block(self, registry_txt):
+        """works for registries from 1975-onward"""
+        business = reg.Business()
+
+        lines = registry_txt.split("\n")
+
+        business.name = lines[0]
+        business.address = lines[1]
+
+        match = self.city_pattern.search(registry_txt)
+        if match:
+            city = match.group(0)
+            match_city = self._city_detector.match_to_cities(city) # perform spell check and confirm this is a city
+            if match_city:
+                if match_city != city:
+                    print("Imperfect city match: %s matched to %s" % (city, match_city))
+                business.city = match_city
+
+        match = self.emp_pattern.search(registry_txt)
+        if match:
+            match = re.search(r"\d+",match.group(0))
+            if match:
+                business.emp = match.group(0)
+
+        return business
+
+
 class RegistryProcessorNew(reg.RegistryProcessor):
     """1975-present RI registry parser."""
     
