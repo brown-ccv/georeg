@@ -45,7 +45,7 @@ args = parser.parse_args()
 if args.state == 'RI':
     if args.year > 1975 and args.year < 1998:
         from georeg.registry_processor_ri import RegistryProcessorNew as RegistryProcessor
-    elif args.year == 1998 or args.year == 2002:
+    elif args.year >= 1998:
         from georeg.registry_processor_ri import RegistryProcessor1998 as RegistryProcessor
     else:
         from georeg.registry_processor_ri import RegistryProcessorOld as RegistryProcessor
