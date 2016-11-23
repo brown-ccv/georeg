@@ -16,45 +16,79 @@ class RegistryProcessor1998(reg.RegistryProcessor):
         super(RegistryProcessor1998, self).__init__()
          
         self.current_sic = ""
-
-        self.city_pattern = re.compile(r'[A-Za-z ]+(?=[,.][ ]+[A-Z]{2}[ ]+[0-9]{5})')
+        self.current_city = ""
+        self.address_pattern = re.compile(r'([^(]*)\((\d{5}).{0,}')
+        self.city_pattern = re.compile(r'[A-Z ]{2,}')
         self.emp_pattern = re.compile(r'[Ee][Mm][Pp].*\d+')
-        self.registry_pattern = re.compile(r'[A-Za-z]+.*\n',)
-        self.sic_pattern = re.compile(r'\d{4}')
+        self.PO_pattern = re.compile(r'P[0O][^(]*\(\d+')
+        self.registry_pattern = re.compile(r'.*',)
+        self.sic_pattern = re.compile(r'SIC.*?(\d{4})')
+        self.name_pattern = re.compile(r'[A-Z ]+')
 
     def _process_contour(self, contour_txt, contour_font_attrs):
         registry_match = self.registry_pattern.match(contour_txt)
-        sic_match = self.sic_pattern.match(contour_txt)
+        #city_match = self.city_pattern.match(contour_txt)
 
         if registry_match:
             business = self._parse_registry_block(contour_txt)
-            business.category = self.current_sic
+            #business.city = self.current_city
 
             geo.geocode_business(business)
             return business
-        elif sic_match:
-            self.current_sic = sic_match.group(0)
+        #elif sic_match:
+           # self.current_sic = sic_match.group(0)
         return reg.Business()
 
 
     def _parse_registry_block(self, registry_txt):
-        """works for registries from 1975-onward"""
+        """works for registries from 1998 and 2002"""
         business = reg.Business()
 
         lines = registry_txt.split("\n")
+        registry_txt = registry_txt.replace('\n', '')
+        
+        #get business name
+        if len(lines) > 1:
+            name_text = lines[0] + " " + lines[1]
+        else:
+            name_text = lines[0]
 
-        business.name = lines[0]
-        business.address = lines[1]
-
-        match = self.city_pattern.search(registry_txt)
+        match = self.name_pattern.search(name_text)
         if match:
-            city = match.group(0)
-            match_city = self._city_detector.match_to_cities(city) # perform spell check and confirm this is a city
-            if match_city:
-                if match_city != city:
-                    print("Imperfect city match: %s matched to %s" % (city, match_city))
-                business.city = match_city
-
+            business.name = match.group(0)
+        else:
+            business.name = name_text
+        
+        # get city name
+        if len(lines) <= 2:
+            match = self.city_pattern.search(registry_txt)
+            if match:
+                city = match.group(0)
+                city = city.title()
+                match_city = self._city_detector.match_to_cities(city) # perform spell check and confirm this is a city
+                if match_city:
+                    business.city = match_city
+                    current_city = match_city
+                    if match_city != city:
+                        print("Imperfect city match: %s matched to %s" % (city, match_city))
+                        business.city = match_city
+        
+        # address and zipcode 
+        for line in lines[1:]:
+            match = self.PO_pattern.search(line)
+            if not match:
+                match = self.address_pattern.search(line)
+                if match:
+                    business.address = match.group(1)
+                    business.zip = match.group(2)
+        
+        # sic code
+        match = self.sic_pattern.search(registry_txt)
+        if match:
+            business.category = match.group(1)
+            #print match.group(1)
+        
+        # employees 
         match = self.emp_pattern.search(registry_txt)
         if match:
             match = re.search(r"\d+",match.group(0))
