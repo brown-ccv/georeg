@@ -23,7 +23,7 @@ class RegistryProcessor1998(reg.RegistryProcessor):
         self.PO_pattern = re.compile(r'P[0O][^(]*\(\d+')
         self.registry_pattern = re.compile(r'.*',)
         self.sic_pattern = re.compile(r'SIC.*?(\d{4})')
-        self.name_pattern = re.compile(r'[A-Z ]+')
+        self.name_pattern = re.compile(r'[A-Z ]{2,}')
 
     def _process_contour(self, contour_txt, contour_font_attrs):
         registry_match = self.registry_pattern.match(contour_txt)
@@ -41,7 +41,7 @@ class RegistryProcessor1998(reg.RegistryProcessor):
 
 
     def _parse_registry_block(self, registry_txt):
-        """works for registries from 1998 and 2002"""
+        """works for registries from 1998 and 2006"""
         business = reg.Business()
 
         lines = registry_txt.split("\n")
