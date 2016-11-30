@@ -67,12 +67,13 @@ class RegistryProcessor1998(reg.RegistryProcessor):
                 city = city.title()
                 match_city = self._city_detector.match_to_cities(city) # perform spell check and confirm this is a city
                 if match_city:
-                    business.city = match_city
-                    current_city = match_city
+                    self.current_city = match_city
                     if match_city != city:
                         print("Imperfect city match: %s matched to %s" % (city, match_city))
-                        business.city = match_city
-        
+                        self.current_city = match_city
+            
+        business.city = self.current_city
+
         # address and zipcode 
         for line in lines[1:]:
             match = self.PO_pattern.search(line)
