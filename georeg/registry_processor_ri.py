@@ -296,7 +296,7 @@ class RegistryProcessorOld(reg.RegistryProcessor):
             header.text = re.sub(r'^"|\n|"$', ' ', header.text).strip()
 
             for business in business_group:
-                call_args.append((business.text, business.text_attrs, header.text))
+                call_args.append((business.text, business.font_attrs, header.text))
 
         return call_args
 
