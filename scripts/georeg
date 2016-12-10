@@ -35,9 +35,11 @@ parser.add_argument(
         Assume images have been preprocessed by scan-tailor.""")
 parser.add_argument(
     "--text-dump-mode", action="store_true", help="""
-    If this option is specified georeg will only ocr and record
-    business contour text *without* processing anything"""
-)
+        If this option is specified georeg will only ocr and record
+        business contour text *without* processing anything""")
+parser.add_argument(
+    "--num-processes", default=1, help="""
+        Number of processes for georeg to use.""")
 
 args = parser.parse_args()
 
