@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description="process and geocode business regis
 
 parser.add_argument(
     "--images", "-i", required=True, help="""
-        Path of images to process (not a list, use unix file matching).""")
+        List of image files to process.""")
 parser.add_argument(
     "--state", "-s", default="", required=True, help="""
         US state to get city list.""")
@@ -35,9 +35,11 @@ parser.add_argument(
         Assume images have been preprocessed by scan-tailor.""")
 parser.add_argument(
     "--text-dump-mode", action="store_true", help="""
-    If this option is specified georeg will only ocr and record
-    business contour text *without* processing anything"""
-)
+        If this option is specified georeg will only ocr and record
+        business contour text *without* processing anything""")
+parser.add_argument(
+    "--num-processes", default=1, type=int, help="""
+        Number of processes for georeg to use.""")
 
 args = parser.parse_args()
 
@@ -166,23 +168,12 @@ if __name__ == "__main__":
         f = open(outname, 'w')
         f.close()
 
-    # construct actual image list from unix file match pattern
-    dir, pattern = os.path.split(args.images)
-    image_list = []
-
-    for item in os.listdir(dir):
-        if fnmatch.fnmatch(item, pattern):
-            image_list.append(os.path.join(dir, item))
-
-    # find number of cores
-    try:
-        num_processes = multiprocessing.cpu_count()
-    except NotImplementedError:
-        print >> sys.stderr, "unable to detect number of cores... defaulting to 4 threads"
-        num_processes = 4
+    image_list = args.images
 
     if args.debug: # if we are looking at debug images we don't want them being written to by 4 processes at once
         num_processes = 1
+    else:
+        num_processes = args.num_processes
 
     # make some variables to be shared with subprocesses
     manager = multiprocessing.Manager()

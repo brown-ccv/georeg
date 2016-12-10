@@ -59,6 +59,9 @@ class Business:
         self.long = ""
         self.confidence_score = 0.0
 
+        # keep track of source file
+        self.image_file = ""
+
 
 class Contour:
     def __init__(self, contour_data=None):
@@ -292,6 +295,7 @@ class RegistryProcessor(object):
         # here we process all of our contours
         for args in call_args:
             business, contour_txt = process_with_args(args)
+            business.image_file = path
 
             num_businesses_found += 1
             self.__num_geo_attempts += 1
@@ -434,7 +438,7 @@ class RegistryProcessor(object):
                 entry = [business.category, business.name, business.address,
                          business.city, business.zip, business.emp, business.sales,
                          business.cat_desc, business.bracket, business.lat, business.long,
-                         business.confidence_score]
+                         business.confidence_score, business.image_file]
 
                 file_writer.writerow(entry)
 
