@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description="process and geocode business regis
 
 parser.add_argument(
     "--images", "-i", required=True, help="""
-        Path of images to process (not a list, use unix file matching).""")
+        List of image files to process.""")
 parser.add_argument(
     "--state", "-s", default="", required=True, help="""
         US state to get city list.""")
@@ -161,13 +161,7 @@ if __name__ == "__main__":
         f = open(outname, 'w')
         f.close()
 
-    # construct actual image list from unix file match pattern
-    dir, pattern = os.path.split(args.images)
-    image_list = []
-
-    for item in os.listdir(dir):
-        if fnmatch.fnmatch(item, pattern):
-            image_list.append(os.path.join(dir, item))
+    image_list = args.images
 
     # find number of cores
     try:
