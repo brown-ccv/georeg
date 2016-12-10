@@ -12,7 +12,7 @@ from datetime import datetime
 parser = argparse.ArgumentParser(description="process and geocode business registries")
 
 parser.add_argument(
-    "--images", "-i", required=True, help="""
+    "--images", "-i", required=True, nargs="+", help="""
         List of image files to process.""")
 parser.add_argument(
     "--state", "-s", default="", required=True, help="""
