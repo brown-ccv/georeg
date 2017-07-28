@@ -119,6 +119,8 @@ configuration files are found in `georeg/configs`.
 
 The following parameters may be set in a configuration file:
 
+| parameter | description |
+| --- | --- |
 | **kernel\_shape\_x** | x-value (in pixels) of kernel to use in contour erosion/dilation |
 | **kernel\_shape\_y** | y-value (in pixels) of kernel to use in contour erosion/dilation |
 | **thresh\_value** | intensity threshold for image binarization |
