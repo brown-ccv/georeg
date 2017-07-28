@@ -119,13 +119,13 @@ configuration files are found in `georeg/configs`.
 
 The following parameters may be set in a configuration file:
 
-* **kernel\_shape\_x**  x-value (in pixels) of kernel to use in contour erosion/dilation
-* **kernel\_shape\_y**  y-value (in pixels) of kernel to use in contour erosion/dilation
-* **thresh\_value**  intensity threshold for image binarization
-* **iterations**  number of close operations to perform per contour
-* **columns\_per\_page**  number of text columns on each book page
-* **pages\_per\_image**  number of pages within each image file
-* **bb\_expansion\_percent**  percent by which to expand the bounding box around each contour
+| **kernel\_shape\_x** | x-value (in pixels) of kernel to use in contour erosion/dilation |
+| **kernel\_shape\_y** | y-value (in pixels) of kernel to use in contour erosion/dilation |
+| **thresh\_value** | intensity threshold for image binarization |
+| **iterations** | number of close operations to perform per contour |
+| **columns\_per\_page** | number of text columns on each book page |
+| **pages\_per\_image** | number of pages within each image file |
+| **bb\_expansion\_percent** | percent by which to expand the bounding box around each contour |
 
 ## Development
 
