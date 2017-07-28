@@ -94,7 +94,7 @@ The test will create the following files and output:
 
     processing: img.png (1/1)
     Mean OCR confidence: 85.274869%
-    Geocoder success rate: 0.000000%
+    Geocoder success rate: 50.000000%
     Businesses per image deviation: 0.000000
     Businesses per image mean: 22.000000
     Elapsed time: 0 hours, 0 minutes and 11 seconds
@@ -102,7 +102,7 @@ The test will create the following files and output:
 
 As discussed below in the "Geocoding" section, you will receive a 0.0%
 geocoding rate using the default settings if you do not have access to Brown
-University's ArcGIS server.
+University's ArcGIS server. 
 
 ## Geocoding
 
