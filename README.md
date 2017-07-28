@@ -86,7 +86,7 @@ To test using a conda installation on Linux, run:
 
     georeg --year 1979 --state RI --images img.png --outdir . --pre-processed
 
-The test will create the files and output:
+The test will create the following files and output:
 
     1979-compiled.tsv
     performance_stats.txt
@@ -110,7 +110,7 @@ By default, **georeg** is configured to access an ArcGIS server at Brown
 University for geocoding. Users not at Brown will need to modify the file
 `georeg/brownarcgis.py` to provide an alternative URL to an ArcGIS server,
 or modify `georeg/business_geocoder.py` to provide an alternative
-geocoding service that is compatible with **geopy**.
+geocoding service that is compatible with geopy.
 
 ## Configuration files
 
@@ -119,13 +119,13 @@ configuration files are found in `georeg/configs`.
 
 The following parameters may be set in a configuration file:
 
-* kernel\_shape\_x: x-value (in pixels) of kernel to use in contour erosion/dilation
-* kernel\_shape\_y: y-value (in pixels) of kernel to use in contour erosion/dilation
-* thresh\_value: intensity threshold for image binarization
-* iterations: number of close operations to perform per contour
-* columns\_per\_page: number of text columns on each book page
-* pages\_per\_image: number of pages within each image file
-* bb\_expansion\_percent: percent by which to expand the bounding box around each contour
+* **kernel\_shape\_x**  x-value (in pixels) of kernel to use in contour erosion/dilation
+* **kernel\_shape\_y**  y-value (in pixels) of kernel to use in contour erosion/dilation
+* **thresh\_value**  intensity threshold for image binarization
+* **iterations**  number of close operations to perform per contour
+* **columns\_per\_page**  number of text columns on each book page
+* **pages\_per\_image**  number of pages within each image file
+* **bb\_expansion\_percent**  percent by which to expand the bounding box around each contour
 
 ## Development
 
