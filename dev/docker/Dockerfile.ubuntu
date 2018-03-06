@@ -36,4 +36,27 @@ RUN cd /tmp && \
 RUN cd /tmp && \
   wget https://github.com/brown-data-science/tessapi/archive/v0.0.1.tar.gz && \
   tar xf v0.0.1.tar.gz && \
-  rm v0.0.1.tar
+  rm v0.0.1.tar.gz && \
+  cd tessapi-* && \
+  python setup.py install
+
+RUN cd /tmp && \
+  wget https://github.com/brown-data-science/georeg/archive/v0.0.1.tar.gz \
+  tar xf v0.0.1.tar.gz && \
+  rm v0.0.1.tar.gz && \
+  cd georeg-* && \
+  python setup.py install
+
+RUN apt-get remove -y \
+  build-essential \
+  libeigen3-dev \
+  libjpeg-dev \
+  libpng-dev \
+  libtesseract-dev \
+  pybind11-dev \
+  wget \
+  zlib1g-dev
+RUN apt-get autoremove
+RUN rm -rf /tmp/*
+
+ENTRYPOINT ["/usr/local/bin/georeg"]
